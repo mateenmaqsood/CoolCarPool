@@ -45,10 +45,17 @@ export const viewport: Viewport = {
  */
 const THEME_INIT_SCRIPT = `try{var t=localStorage.getItem('ccp-theme');document.documentElement.dataset.theme=t?t:'light'}catch(e){document.documentElement.dataset.theme='light'}`
 
+/**
+ * Synchronous FOUC prevention — runs before any React hydration.
+ * Must be in <head> and not async/deferred.
+ */
+const THEME_FOUC_SCRIPT = `try{var t=localStorage.getItem('ccp-theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}`
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={satoshi.variable}>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_FOUC_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-dvh bg-canvas font-sans text-ink">

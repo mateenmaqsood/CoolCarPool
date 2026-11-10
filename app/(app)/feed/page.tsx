@@ -3,7 +3,7 @@ import { TravelFeed } from '@/components/travel/TravelFeed'
 import { getMockFeed, type FeedTravel } from '@/lib/mock-data'
 import type { Gender } from '@/types'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 60
 export const metadata = { title: 'Ride Feed' }
 
 /**

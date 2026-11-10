@@ -85,6 +85,7 @@ export function TravelCard({ travel, isOwn, className }: TravelCardProps) {
   return (
     <Link
       href={`/travel/${travel.id}`}
+      prefetch={true}
       className={cn(
         'group flex flex-col gap-4 rounded-3xl bg-card p-5 shadow-soft transition-all duration-200',
         'hover:-translate-y-0.5 hover:shadow-card',
