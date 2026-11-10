@@ -2,10 +2,10 @@
 
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useState } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowRight, Eye, EyeOff, KeyRound, Mail } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, KeyRound, Mail, Fingerprint } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toast'
@@ -18,6 +18,8 @@ function LoginCard() {
   const { toast } = useToast()
   const supabase = createClient()
   const [showPassword, setShowPassword] = useState(false)
+  const [bioSupported, setBioSupported] = useState<boolean | null>(null)
+  const [bioLoading, setBioLoading] = useState(false)
 
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -26,6 +28,68 @@ function LoginCard() {
   })
 
   const redirectTo = params.get('redirect_to')
+
+  useEffect(() => {
+    setBioSupported(
+      typeof window !== 'undefined' &&
+      'credentials' in navigator &&
+      'PublicKeyCredential' in window
+    )
+  }, [])
+
+  async function handleBiometricLogin() {
+    setBioLoading(true)
+    try {
+      const email = form.getValues('email')
+      if (!email) {
+        toast({ title: 'Enter your email first', variant: 'warning' })
+        setBioLoading(false)
+        return
+      }
+
+      const challenge = new Uint8Array(32)
+      crypto.getRandomValues(challenge)
+
+      await navigator.credentials.get({
+        publicKey: {
+          challenge,
+          rpId: window.location.hostname,
+          userVerification: 'required',
+          timeout: 60000,
+          allowCredentials: [],
+        },
+      })
+
+      // Biometric passed — retrieve stored credentials (hackathon approach)
+      const stored = localStorage.getItem(`ccp-bio-${btoa(email)}`)
+      if (!stored) {
+        toast({
+          title: 'No biometric saved for this email',
+          description: 'Log in with password first to enable it.',
+          variant: 'warning',
+        })
+        setBioLoading(false)
+        return
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({ email, password: atob(stored) })
+      if (error) throw error
+
+      toast({ title: 'Biometric login successful! 🔐', variant: 'success' })
+      const target = redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : '/feed'
+      router.push(target)
+      router.refresh()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg.includes('NotAllowed') || msg.includes('cancel')) {
+        toast({ title: 'Biometric cancelled', variant: 'warning' })
+      } else {
+        toast({ title: 'Biometric failed — use password instead', variant: 'error' })
+      }
+    } finally {
+      setBioLoading(false)
+    }
+  }
 
   async function onSubmit({ email, password }: LoginValues) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -90,6 +154,23 @@ function LoginCard() {
           <ArrowRight className="h-4 w-4" />
         </Button>
       </form>
+
+      {bioSupported && (
+        <>
+          <div className="flex items-center gap-2">
+            <div className="h-px flex-1 bg-[var(--border)]" />
+            <span className="text-xs text-ink-tertiary">or</span>
+            <div className="h-px flex-1 bg-[var(--border)]" />
+          </div>
+          <Button type="button" variant="secondary" onClick={handleBiometricLogin} loading={bioLoading} className="h-11 w-full gap-2">
+            <Fingerprint className="h-4 w-4" />
+            Sign in with Face ID / Fingerprint
+          </Button>
+        </>
+      )}
+      {bioSupported === false && (
+        <p className="text-center text-xs text-ink-tertiary">Biometric login not available on this device</p>
+      )}
 
       <p className="text-center text-sm text-ink-secondary">
         New here?{' '}

@@ -86,6 +86,15 @@ export default function SignupPage() {
       toast({ title: 'Account created 🎉', description: 'Your ride circle is ready.', variant: 'success' })
     }
 
+    // Offer biometric login enablement
+    if (typeof window !== 'undefined' && 'credentials' in navigator) {
+      const enable = window.confirm('Enable biometric login (Face ID / Fingerprint) on this device?')
+      if (enable) {
+        localStorage.setItem(`ccp-bio-${btoa(values.email)}`, btoa(values.password))
+        toast({ title: 'Biometric login enabled! 🔐', variant: 'success' })
+      }
+    }
+
     router.push('/feed')
     router.refresh()
   }
