@@ -241,7 +241,11 @@ export function TravelForm() {
 
   /* ---------------- Submission + duplicate pipeline ---------------- */
 
-  async function createTravel() {
+  /**
+   * Insert the travel row + host membership. Returns the new travel id,
+   * or null on failure (toast shown). No navigation side effects.
+   */
+  async function insertTravel(): Promise<string | null> {
     setSubmitting(true)
     try {
       const v = getValues()
@@ -272,7 +276,7 @@ export function TravelForm() {
           description: error?.message ?? 'Please try again.',
           variant: 'error',
         })
-        return
+        return null
       }
 
       // Host becomes the first member (full route).
@@ -284,17 +288,86 @@ export function TravelForm() {
         km_from_origin: 0,
       })
 
-      toast({
-        title: 'Travel posted 🎉',
-        description: `${v.origin} → ${v.destination} is live on the feed.`,
-        variant: 'success',
-      })
-      router.push('/feed')
-      router.refresh()
+      return data.id
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  /** Post the ride as its own travel (the "Keep Separate" path). */
+  async function createTravel() {
+    const newId = await insertTravel()
+    setDupOpen(false)
+    setDupMatches(null)
+    if (!newId) return
+
+    toast({
+      title: 'Travel posted 🎉',
+      description: `${getValues('origin')} → ${getValues('destination')} is live on the feed.`,
+      variant: 'success',
+    })
+    router.push('/feed')
+    router.refresh()
+  }
+
+  /**
+   * Merge CTA — posts the new ride as the duplicate *candidate*, then merges it
+   * into the matched primary via /api/merge-travel. Per guardrails, a merge
+   * failure never blocks the post: the ride falls back to staying separate.
+   */
+  async function handleMerge() {
+    const top = dupMatches?.[0]
+    if (!top) {
+      // No match to merge into — degrade to a normal post.
+      await createTravel()
+      return
+    }
+
+    const candidateId = await insertTravel()
+    if (!candidateId) return
+
+    const fallbackToSeparate = () => {
+      toast({
+        title: 'Merge could not complete',
+        description: 'Your ride was still posted separately on the feed.',
+        variant: 'warning',
+      })
       setDupOpen(false)
       setDupMatches(null)
+      router.push('/feed')
+      router.refresh()
+    }
+
+    try {
+      const res = await fetch('/api/merge-travel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primary_id: top.travel.id,
+          candidate_id: candidateId,
+          action: 'merge',
+        }),
+      })
+      const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null
+
+      if (res.ok && json?.ok) {
+        toast({
+          title: 'Rides merged 🤝',
+          description: `Your ride joined ${top.travel.origin_text} → ${top.travel.destination_text}. Riders are pooled into one car.`,
+          variant: 'success',
+        })
+        setDupOpen(false)
+        setDupMatches(null)
+        router.push(`/travel/${top.travel.id}`)
+        router.refresh()
+        return
+      }
+
+      console.error('[host] merge API failed:', json?.error ?? res.status)
+      fallbackToSeparate()
+    } catch (error) {
+      console.error('[host] merge error:', error)
+      fallbackToSeparate()
     }
   }
 
@@ -355,18 +428,6 @@ export function TravelForm() {
     } finally {
       setSubmitting(false)
     }
-  }
-
-  /** Merge CTA — the merge API lands in Phase 5; today we keep the post. */
-  async function handleMerge() {
-    // TODO(Phase 5): POST /api/merge-travel → transfer pending requests,
-    // set secondary to status='merged', notify all riders.
-    toast({
-      title: 'Merge syncs riders automatically',
-      description: 'Merge API is in Phase 5 — posting your ride for now.',
-      variant: 'warning',
-    })
-    await createTravel()
   }
 
   const busy = submitting

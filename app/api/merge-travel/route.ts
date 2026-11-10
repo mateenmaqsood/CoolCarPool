@@ -2,11 +2,16 @@
  * CoolCarPool — POST /api/merge-travel
  *
  * Handles the "Merge" action from DuplicateModal.
- * Merges candidate travel into primary travel:
- *  - Transfers pending requests to primary
- *  - Sets candidate status = 'merged', merged_into_id = primary
- *  - Notifies all affected users
- *  - Records action in duplicate_matches
+ * Two initiator directions are supported:
+ *   1. Primary host merges a duplicate candidate into their ride.
+ *   2. Candidate host (posting flow) merges their new ride into the
+ *      matched primary — this is the DuplicateModal "Merge Travel" path.
+ *
+ * On merge:
+ *  - Candidate status = 'merged', merged_into_id = primary
+ *  - Candidate's pending join requests transfer to the primary
+ *  - Every host/member affected is notified (except the initiator)
+ *  - The decision is recorded in duplicate_matches
  *
  * Body: { primary_id, candidate_id, action: 'merge' | 'keep' }
  * Response: { ok, travel_id }
@@ -40,9 +45,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'Missing required fields' }, { status: 400 })
   }
 
+  if (primary_id === candidate_id) {
+    return NextResponse.json({ ok: false, error: 'A travel cannot merge into itself' }, { status: 400 })
+  }
+
   if (action === 'keep') {
-    // Just record the decision
-    await supabase.from('duplicate_matches').upsert({
+    // Just record the decision — no side effects.
+    await supabase.from('duplicate_matches').insert({
       primary_id,
       candidate_id,
       action: 'kept',
@@ -52,37 +61,53 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, travel_id: primary_id })
   }
 
-  // Action is 'merge' - verify user is host of primary
-  const { data: primaryTravel, error: primaryError } = await supabase
-    .from('travels')
-    .select('host_id')
-    .eq('id', primary_id)
-    .single()
+  // Action is 'merge' — verify the user is host of either travel.
+  const [primaryRes, candidateRes] = await Promise.all([
+    supabase
+      .from('travels')
+      .select('id, host_id, origin_text, destination_text, status')
+      .eq('id', primary_id)
+      .single(),
+    supabase
+      .from('travels')
+      .select('id, host_id, origin_text, destination_text, status')
+      .eq('id', candidate_id)
+      .single(),
+  ])
 
-  if (primaryError || !primaryTravel) {
+  const primaryTravel = primaryRes.data
+  const candidateTravel = candidateRes.data
+
+  if (!primaryTravel) {
     return NextResponse.json({ ok: false, error: 'Primary travel not found' }, { status: 404 })
   }
+  if (!candidateTravel) {
+    return NextResponse.json({ ok: false, error: 'Candidate travel not found' }, { status: 404 })
+  }
 
-  if (primaryTravel.host_id !== user.id) {
-    return NextResponse.json({ ok: false, error: 'Only host of primary travel can merge' }, { status: 403 })
+  const isPrimaryHost = primaryTravel.host_id === user.id
+  const isCandidateHost = candidateTravel.host_id === user.id
+
+  if (!isPrimaryHost && !isCandidateHost) {
+    return NextResponse.json(
+      { ok: false, error: 'Only the host of one of the merged travels can merge' },
+      { status: 403 },
+    )
+  }
+
+  // Already-resolved duplicates are idempotent no-ops.
+  if (candidateTravel.status === 'merged') {
+    return NextResponse.json({ ok: true, travel_id: primary_id, already_merged: true })
+  }
+  if (primaryTravel.status === 'merged') {
+    return NextResponse.json({ ok: false, error: 'Primary travel is already merged' }, { status: 409 })
   }
 
   try {
-    // 1. Get candidate travel details
-    const { data: candidateTravel, error: candidateError } = await supabase
-      .from('travels')
-      .select('*')
-      .eq('id', candidate_id)
-      .single()
-
-    if (candidateError || !candidateTravel) {
-      return NextResponse.json({ ok: false, error: 'Candidate travel not found' }, { status: 404 })
-    }
-
-    // 2. Transfer pending requests from candidate to primary
+    // 1. Transfer pending requests from candidate → primary.
     const { data: pendingRequests, error: reqError } = await supabase
       .from('travel_requests')
-      .select('*')
+      .select('requester_id, waypoint_id, km_from_origin, message')
       .eq('travel_id', candidate_id)
       .eq('status', 'pending')
 
@@ -100,69 +125,102 @@ export async function POST(request: Request) {
 
       const { error: insertError } = await supabase.from('travel_requests').insert(transfers)
       if (insertError) throw insertError
+
+      // Remove the originals — the copies under the primary carry the transfer.
+      // (The status CHECK constraint doesn't allow a 'transferred' value.)
+      const { error: deleteError } = await supabase
+        .from('travel_requests')
+        .delete()
+        .eq('travel_id', candidate_id)
+        .eq('status', 'pending')
+      if (deleteError) throw deleteError
     }
 
-    // 3. Mark candidate as merged
+    // 2. Mark the candidate as merged into the primary.
     const { error: updateError } = await supabase
       .from('travels')
       .update({
         status: 'merged',
         merged_into_id: primary_id,
+        available_seats: 0,
       })
       .eq('id', candidate_id)
 
     if (updateError) throw updateError
 
-    // 4. Notify candidate host
-    await supabase.from('notifications').insert({
-      user_id: candidateTravel.host_id,
-      type: 'travel_merged',
-      travel_id: primary_id,
-      payload: {
-        candidate_id: candidate_id,
-        primary_id: primary_id,
-        message: `Your travel "${candidateTravel.origin_text} → ${candidateTravel.destination_text}" was merged into another ride.`,
-      },
-    })
+    // 3. Notify everyone affected except the initiator.
+    const routeLabel = `${candidateTravel.origin_text} → ${candidateTravel.destination_text}`
+    const notifications: Array<{
+      user_id: string
+      type: string
+      travel_id: string
+      payload: { message: string }
+    }> = []
 
-    // 5. Notify candidate's pending requesters
-    if (pendingRequests && pendingRequests.length > 0) {
-      const notifications = pendingRequests.map((req) => ({
-        user_id: req.requester_id,
-        type: 'request_received',
+    // Candidate host (when someone else merged their ride away).
+    if (!isCandidateHost) {
+      notifications.push({
+        user_id: candidateTravel.host_id,
+        type: 'travel_merged',
         travel_id: primary_id,
         payload: {
-          message: `Your join request was transferred to a merged ride: ${candidateTravel.origin_text} → ${candidateTravel.destination_text}`,
+          message: `Your travel "${routeLabel}" was merged into another ride. Your riders were transferred automatically.`,
         },
-      }))
-      await supabase.from('notifications').insert(notifications)
+      })
     }
 
-    // 6. Notify primary travel members
+    // Primary host (when the candidate host initiated the merge).
+    if (!isPrimaryHost) {
+      notifications.push({
+        user_id: primaryTravel.host_id,
+        type: 'merge_received',
+        travel_id: primary_id,
+        payload: {
+          message: `A similar ride ("${routeLabel}") was merged into your travel. More seats may now be pooled together.`,
+        },
+      })
+    }
+
+    // Candidate's pending requesters — their request now targets the primary.
+    if (pendingRequests) {
+      for (const req of pendingRequests) {
+        notifications.push({
+          user_id: req.requester_id,
+          type: 'request_transferred',
+          travel_id: primary_id,
+          payload: {
+            message: `Your join request was transferred to a merged ride: ${primaryTravel.origin_text} → ${primaryTravel.destination_text}`,
+          },
+        })
+      }
+    }
+
+    // Primary members — heads-up that the pool grew.
     const { data: primaryMembers } = await supabase
       .from('travel_members')
       .select('user_id')
       .eq('travel_id', primary_id)
 
     if (primaryMembers) {
-      const memberNotifications = primaryMembers
-        .filter((m) => m.user_id !== user.id) // Don't notify the host who initiated
-        .map((m) => ({
-          user_id: m.user_id,
+      for (const member of primaryMembers) {
+        if (member.user_id === user.id) continue
+        notifications.push({
+          user_id: member.user_id,
           type: 'travel_merged',
           travel_id: primary_id,
           payload: {
-            message: `A similar ride was merged into this travel. More seats may be available.`,
+            message: 'A similar ride was merged into this travel. More seats may be available.',
           },
-        }))
-
-      if (memberNotifications.length > 0) {
-        await supabase.from('notifications').insert(memberNotifications)
+        })
       }
     }
 
-    // 7. Record merge in duplicate_matches
-    await supabase.from('duplicate_matches').upsert({
+    if (notifications.length > 0) {
+      await supabase.from('notifications').insert(notifications)
+    }
+
+    // 4. Record the merge decision.
+    await supabase.from('duplicate_matches').insert({
       primary_id,
       candidate_id,
       action: 'merged',
