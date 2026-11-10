@@ -39,6 +39,8 @@ export function ChatClient({ travel, members, messages, currentUserId, isHost }:
   const { toast } = useToast()
   const supabase = createClient()
 
+  const isMember = currentUserId ? members.some(m => m.user_id === currentUserId && !m.is_host) : false
+
   const [localMessages, setLocalMessages] = useState(messages)
   const [newMessage, setNewMessage] = useState('')
   const [showMemberList, setShowMemberList] = useState(false)
@@ -73,48 +75,30 @@ export function ChatClient({ travel, members, messages, currentUserId, isHost }:
   const memberProfiles = members.map((m) => m.profile).filter(Boolean) as Profile[]
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !currentUserId) return
+    if (!newMessage.trim()) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
 
     const content = newMessage.trim()
     setNewMessage('')
-
-    // Optimistic update
     const tempId = `temp-${Date.now()}`
-    const optimisticMsg: Message & { sender?: Profile | null } = {
-      id: tempId,
-      travel_id: travel.id,
-      sender_id: currentUserId,
-      content,
-      is_system: false,
-      created_at: new Date().toISOString(),
-      sender: memberProfiles.find((p) => p.id === currentUserId) ?? null,
+    const myProfile = members.find(m => m.user_id === user.id)?.profile ?? null
+    setLocalMessages(prev => [...prev, {
+      id: tempId, travel_id: travel.id, sender_id: user.id,
+      content, is_system: false, created_at: new Date().toISOString(), sender: myProfile
+    }])
+
+    const { data, error } = await supabase.from('messages')
+      .insert({ travel_id: travel.id, sender_id: user.id, content })
+      .select('id, created_at').single()
+
+    if (error) {
+      setLocalMessages(prev => prev.filter(m => m.id !== tempId))
+      setNewMessage(content)
+      toast({ title: error.code === '42501' ? 'Only accepted members can chat' : 'Message failed', description: error.message, variant: 'error' })
+      return
     }
-    setLocalMessages((prev) => [...prev, optimisticMsg])
-
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          travel_id: travel.id,
-          sender_id: currentUserId,
-          content,
-          is_system: false,
-        })
-        .select('*, sender:profiles!messages_sender_id_fkey(*)')
-        .single()
-
-      if (error) throw error
-
-      // Replace optimistic with real
-      setLocalMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...data, sender: data.sender } : m))
-      )
-    } catch (error) {
-      console.error('[chat] send error:', error)
-      // Remove optimistic on failure
-      setLocalMessages((prev) => prev.filter((m) => m.id !== tempId))
-      toast({ title: 'Failed to send message', variant: 'error' })
-    }
+    setLocalMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: data.id, created_at: data.created_at } : m))
   }
 
   const handleLeaveTravel = async () => {
@@ -244,30 +228,37 @@ export function ChatClient({ travel, members, messages, currentUserId, isHost }:
       </div>
 
       {/* Message Input */}
-      <div className="border-t border-line bg-elevated px-4 py-3">
-        <div className="flex items-end gap-2">
-          <textarea
-            ref={inputRef}
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
-            rows={1}
-            className="flex-1 min-h-[44px] max-h-[120px] rounded-xl bg-card px-3 py-2 text-sm text-ink outline-none focus:ring-2 focus:ring-brand-soft resize-none"
-            aria-label="Message"
-            style={{ overflow: 'hidden' }}
-          />
-          <Button
-            variant="primary"
-            onClick={handleSendMessage}
-            disabled={!newMessage.trim()}
-            className="h-10 shrink-0"
-            aria-label="Send message"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
+      {(isMember || isHost) ? (
+        <div className="border-t border-line bg-elevated px-4 py-3">
+          <div className="flex items-end gap-2">
+            <textarea
+              ref={inputRef}
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message..."
+              rows={1}
+              className="flex-1 min-h-[44px] max-h-[120px] rounded-xl bg-card px-3 py-2 text-sm text-ink outline-none focus:ring-2 focus:ring-brand-soft resize-none"
+              aria-label="Message"
+              style={{ overflow: 'hidden' }}
+            />
+            <Button
+              variant="primary"
+              onClick={handleSendMessage}
+              disabled={!newMessage.trim()}
+              className="h-10 shrink-0"
+              aria-label="Send message"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center justify-center gap-2 rounded-2xl bg-elevated p-4 text-sm text-ink-secondary border-t border-line">
+          <Shield className="h-4 w-4" />
+          Chat unlocks once the host accepts your request.
+        </div>
+      )}
 
       {/* Member List Modal */}
       <Dialog open={showMemberList} onOpenChange={setShowMemberList}>

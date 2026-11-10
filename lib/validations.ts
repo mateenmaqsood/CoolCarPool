@@ -84,7 +84,7 @@ export const hostFormSchema = z
     estimated_cost_pkr: z
       .number({ invalid_type_error: 'Enter an estimate' })
       .int('Whole PKR only')
-      .min(100, 'At least PKR 100 — fuel is not free')
+      .min(1, 'Enter an amount')
       .max(1_000_000, 'That looks unrealistic'),
     description: z.string().max(500, 'Keep it under 500 characters').optional().or(z.literal('')),
   })

@@ -71,27 +71,31 @@ export function TravelDetailClient({
   const pendingRequests = members.filter((m) => !m.is_host && !m.is_full_route && m.km_from_origin > 0 && m.id.startsWith('REQ_'))
 
   const handleRequestJoin = async (waypointId: string | null, message: string) => {
-    if (!currentUserId) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { toast({ title: 'Please log in first', variant: 'error' }); return }
 
     try {
+      const selectedWp = waypointId ? waypoints.find(w => w.id === waypointId) : null
       const { error } = await supabase.from('travel_requests').insert({
         travel_id: travel.id,
-        requester_id: currentUserId,
-        waypoint_id: waypointId,
-        km_from_origin: waypointId
-          ? waypoints.find((w) => w.id === waypointId)?.km_from_origin ?? 0
-          : 0,
-        message,
+        requester_id: user.id,
+        waypoint_id: waypointId ?? null,
+        km_from_origin: selectedWp?.km_from_origin ?? 0,
+        message: message.trim() || null,
         status: 'pending',
       })
-
-      if (error) throw error
-
-      toast({ title: 'Request sent!', description: 'Host will review your request.', variant: 'success' })
+      if (error) {
+        if (error.code === '23505') {
+          toast({ title: 'You already requested this ride', variant: 'warning' })
+        } else {
+          toast({ title: 'Could not send request', description: error.message, variant: 'error' })
+        }
+        return
+      }
+      toast({ title: 'Request sent! 🚗', description: 'Host will review shortly.', variant: 'success' })
       router.refresh()
-    } catch (error) {
-      console.error('[join] error:', error)
-      toast({ title: 'Failed to send request', variant: 'error' })
+    } catch (err: unknown) {
+      toast({ title: 'Request failed', description: err instanceof Error ? err.message : 'Unknown', variant: 'error' })
     }
   }
 

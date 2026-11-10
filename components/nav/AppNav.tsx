@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -74,11 +73,15 @@ function TopBar() {
       <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-3 px-4">
         {/* Brand */}
         <Link href="/feed" className="flex items-center gap-2.5" aria-label="CoolCarPool home">
-          <span className="overflow-hidden rounded-xl shadow-soft">
-            <Image src="/logo.jpeg" alt="CoolCarPool logo" width={36} height={36} priority className="h-9 w-9 object-cover" />
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand shadow-soft">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5 17H3a2 2 0 01-2-2V9a2 2 0 012-2h1l3-4h8l3 4h1a2 2 0 012 2v6a2 2 0 01-2 2h-2" stroke="#101408" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="7.5" cy="17.5" r="2.5" stroke="#101408" strokeWidth="2"/>
+              <circle cx="16.5" cy="17.5" r="2.5" stroke="#101408" strokeWidth="2"/>
+            </svg>
           </span>
           <span className="text-[15px] font-bold tracking-tight text-ink">
-            Cool<span className="accent-text-gradient">CarPool</span>
+            Cool<span className="text-brand">CarPool</span>
           </span>
         </Link>
 

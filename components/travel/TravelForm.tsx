@@ -168,6 +168,7 @@ export function TravelForm() {
   const [dupMatches, setDupMatches] = useState<DuplicateMatchView[] | null>(null)
   const [dupOpen, setDupOpen] = useState(false)
   const [banner, setBanner] = useState<DuplicateMatchView[]>([])
+  const [routeKm, setRouteKm] = useState<number>(0)
 
   const form = useForm<HostFormValues>({
     resolver: zodResolver(hostFormSchema),
@@ -214,7 +215,19 @@ export function TravelForm() {
     void form
       .trigger(fields as never)
       .then((ok) => {
-        if (ok) setStep((s) => Math.min(s + 1, 3))
+        if (ok) {
+          // Task 7: enforce minimum cost = routeKm * 20 on step 2 (Details)
+          if (step === 2 && routeKm > 0) {
+            const cost = getValues('estimated_cost_pkr')
+            if (cost < routeKm * 20) {
+              form.setError('estimated_cost_pkr', {
+                message: `Minimum is PKR ${routeKm * 20} for this ${routeKm} km route (${routeKm} km × PKR 20/km)`
+              })
+              return
+            }
+          }
+          setStep((s) => Math.min(s + 1, 3))
+        }
       })
   }
 
@@ -241,32 +254,33 @@ export function TravelForm() {
   async function insertTravel(): Promise<string | null> {
     setSubmitting(true)
     try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError || !user) {
+        toast({ title: 'Session expired — please log in again', variant: 'error' })
+        return null
+      }
       const v = getValues()
-      const { data, error } = await supabase
-        .from('travels')
-        .insert({
-          host_id: profile?.id,
-          origin_text: v.origin.trim(),
-          destination_text: v.destination.trim(),
-          total_km: 0, // refined with maps later (SVG simulation today)
-          departure_at: departureIso ?? new Date().toISOString(),
-          is_recurring: v.is_recurring,
-          recurring_days: v.is_recurring ? v.recurring_days : null,
-          total_seats: v.total_seats,
-          available_seats: v.total_seats,
-          gender_preference: v.gender_preference,
-          pickup_radius_km: v.pickup_radius_km as 1 | 2 | 3,
-          estimated_cost_pkr: v.estimated_cost_pkr,
-          description: v.description || null,
-          status: 'open',
-        })
-        .select('id')
-        .single()
+      const { data, error } = await supabase.from('travels').insert({
+        host_id: user.id,  // CRITICAL: fresh user.id, not profile?.id
+        origin_text: v.origin.trim(),
+        destination_text: v.destination.trim(),
+        total_km: routeKm ?? 0,
+        departure_at: departureIso ?? new Date().toISOString(),
+        is_recurring: v.is_recurring,
+        recurring_days: v.is_recurring ? v.recurring_days : null,
+        total_seats: v.total_seats,
+        available_seats: v.total_seats,
+        gender_preference: v.gender_preference,
+        pickup_radius_km: v.pickup_radius_km as 1 | 2 | 3,
+        estimated_cost_pkr: v.estimated_cost_pkr,
+        description: v.description || null,
+        status: 'open',
+      }).select('id').single()
 
       if (error || !data) {
         toast({
           title: 'Could not post travel',
-          description: error?.message ?? 'Please try again.',
+          description: error?.message,
           variant: 'error',
         })
         return null
@@ -275,7 +289,7 @@ export function TravelForm() {
       // Host becomes the first member (full route).
       await supabase.from('travel_members').insert({
         travel_id: data.id,
-        user_id: profile?.id,
+        user_id: user.id,  // fresh user.id
         is_host: true,
         is_full_route: true,
         km_from_origin: 0,
@@ -477,6 +491,10 @@ export function TravelForm() {
                 {...register('destination')}
                 error={destination_error?.toString()}
               />
+              <CityPills
+                selected={values.destination ?? ''}
+                onSelect={(city) => setValue('destination', city, { shouldValidate: true })}
+              />
             </>
           ) : null}
 
@@ -629,7 +647,9 @@ export function TravelForm() {
                 inputMode="numeric"
                 leftIcon={<Wallet className="h-4 w-4" />}
                 rightSlot="PKR total"
-                helperText={perSeatHint ?? 'Fuel + tolls for the whole route — split automatically later'}
+                helperText={routeKm > 0
+                  ? `Min PKR ${routeKm * 20} for ${routeKm} km · ${perSeatHint ?? ''}`
+                  : perSeatHint ?? 'Fuel + tolls for the whole route — split later'}
                 {...register('estimated_cost_pkr', { valueAsNumber: true })}
                 error={errors.estimated_cost_pkr?.message?.toString()}
               />
