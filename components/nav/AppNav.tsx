@@ -3,8 +3,9 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { CalendarPlus, LayoutList, LogOut, Moon, Sun, UserRound } from 'lucide-react'
+import { Bell, CalendarPlus, LayoutList, LogOut, Moon, Sun, UserRound } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
+import { Badge } from '@/components/ui/Badge'
 import { createClient } from '@/lib/supabase/client'
 import { useTheme } from '@/app/providers'
 import type { Profile } from '@/types'
@@ -48,6 +49,7 @@ function TopBar() {
   const { theme, toggleTheme } = useTheme()
   const supabase = createClient()
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [unreadCount, setUnreadCount] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -56,12 +58,22 @@ function TopBar() {
         data: { user },
       } = await supabase.auth.getUser()
       if (!user || cancelled) return
-      const { data } = await supabase
+
+      // Fetch profile
+      const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single()
-      if (!cancelled) setProfile((data as Profile) ?? null)
+      if (!cancelled) setProfile((profileData as Profile) ?? null)
+
+      // Fetch unread notification count
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('read', false)
+      if (!cancelled) setUnreadCount(count ?? 0)
     })()
     return () => {
       cancelled = true
@@ -100,6 +112,19 @@ function TopBar() {
 
         {/* Right cluster */}
         <div className="flex items-center gap-2">
+          {/* Notification Bell */}
+          <Link
+            href="/notifications"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full bg-card text-ink-secondary transition-colors hover:text-ink hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
+            aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
+          >
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-brand-ink text-[10px] font-bold">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </Link>
           <ThemeButton theme={theme} onToggle={toggleTheme} />
           <UserMenu
             className="hidden md:flex"
@@ -179,6 +204,25 @@ function UserMenu({ name, avatarUrl, className }: { name: string; avatarUrl: str
 /** Floating charcoal pill tab bar for mobile — the mockup's bottom nav. */
 function TabBar() {
   const pathname = usePathname()
+  const supabase = createClient()
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('read', false)
+      if (!cancelled) setUnreadCount(count ?? 0)
+    })()
+    return () => { cancelled = true }
+  }, [supabase])
 
   return (
     <nav
@@ -203,6 +247,22 @@ function TabBar() {
             </Link>
           )
         })}
+        {/* Notifications in mobile tab bar */}
+        <Link
+          href="/notifications"
+          className={cn(
+            'flex w-[4.5rem] flex-col items-center gap-0.5 rounded-pill py-2 transition-colors duration-150',
+            'text-ink-tertiary hover:text-white',
+          )}
+        >
+          <Bell className="h-5 w-5" />
+          <span className="text-[9px] font-semibold tracking-wide">Alerts</span>
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-brand text-brand-ink text-[8px] font-bold">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </Link>
       </div>
     </nav>
   )
