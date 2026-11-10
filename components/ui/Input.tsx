@@ -37,7 +37,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
         <div
           className={cn(
-            'group flex h-10 w-full items-center gap-2 rounded-xl border bg-elevated px-3 transition-all duration-150',
+            'group flex h-12 w-full items-center gap-2 rounded-pill border bg-elevated px-4 transition-all duration-150',
             'focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-soft',
             hasError && 'border-[var(--error)] focus-within:border-[var(--error)] focus-within:ring-[color-mix(in_srgb,var(--error)_18%,transparent)]',
             !hasError && 'border-line',

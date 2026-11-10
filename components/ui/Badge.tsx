@@ -13,18 +13,18 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: 'border-line bg-elevated text-ink-secondary',
-        outline: 'border-line bg-transparent text-ink-secondary',
-        brand:
-          'border-[color-mix(in_srgb,var(--brand)_25%,transparent)] bg-[color-mix(in_srgb,var(--brand)_12%,transparent)] text-brand dark:text-[color-mix(in_srgb,var(--brand)_80%,white)]',
+        default: 'border-transparent bg-elevated text-ink-secondary',
+        outline: 'border border-line bg-transparent text-ink-secondary',
+        /** Solid spring-green pill (selected / accent states). */
+        brand: 'border-transparent bg-brand text-brand-ink font-semibold',
         success:
           'border-[color-mix(in_srgb,var(--ok)_25%,transparent)] bg-[color-mix(in_srgb,var(--ok)_12%,transparent)] text-[var(--ok)]',
         warning:
           'border-[color-mix(in_srgb,var(--warn)_30%,transparent)] bg-[color-mix(in_srgb,var(--warn)_14%,transparent)] text-[var(--warn)] dark:text-[color-mix(in_srgb,var(--warn)_75%,white)]',
         danger:
           'border-[color-mix(in_srgb,var(--error)_28%,transparent)] bg-[color-mix(in_srgb,var(--error)_12%,transparent)] text-[var(--error)]',
-        /** Warm gradient hero badge. */
-        gradient: 'accent-gradient border-transparent text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.15)]',
+        /** Charcoal pill with green text — the "2 Seats Left" badge. */
+        gradient: 'border-transparent bg-nav text-brand font-semibold',
       },
       size: {
         sm: 'px-2 py-0.5 text-[10px]',

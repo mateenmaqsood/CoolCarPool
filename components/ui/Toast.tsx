@@ -26,20 +26,20 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null)
 
 const VARIANT_STYLES: Record<ToastVariant, { icon: typeof Info; className: string; iconClassName: string }> = {
-  default: { icon: Info, className: 'border-line bg-elevated', iconClassName: 'text-brand' },
+  default: { icon: Info, className: 'bg-elevated', iconClassName: 'text-ink-secondary' },
   success: {
     icon: CheckCircle2,
-    className: 'border-[color-mix(in_srgb,var(--ok)_30%,transparent)] bg-elevated',
+    className: 'bg-elevated',
     iconClassName: 'text-[var(--ok)]',
   },
   warning: {
     icon: AlertTriangle,
-    className: 'border-[color-mix(in_srgb,var(--warn)_35%,transparent)] bg-elevated',
+    className: 'bg-elevated',
     iconClassName: 'text-warn',
   },
   error: {
     icon: XCircle,
-    className: 'border-[color-mix(in_srgb,var(--error)_35%,transparent)] bg-elevated',
+    className: 'bg-elevated',
     iconClassName: 'text-[var(--error)]',
   },
 }
@@ -86,7 +86,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               key={t.id}
               role="status"
               className={cn(
-                'pointer-events-auto flex items-start gap-3 rounded-2xl border p-4 shadow-float animate-slide-in-right',
+                'pointer-events-auto flex items-start gap-3 rounded-3xl p-4 shadow-float animate-slide-in-right',
                 className,
               )}
             >

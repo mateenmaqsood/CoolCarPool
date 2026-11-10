@@ -3,70 +3,82 @@
 @tailwind utilities;
 
 /* ==========================================================================
-   CoolCarPool — Apple-inspired semantic design tokens
-   Light theme values are the defaults; [data-theme="dark"] overrides below.
+   CoolCarPool — Spring Green design tokens
+   Reference mockup language: warm off-white canvas, borderless warm-gray
+   cards, single spring-green accent, near-black ink, pill interactive
+   elements. Light theme values are the defaults; [data-theme="dark"]
+   re-derives the same family on charcoal.
    ========================================================================== */
 
 :root {
-  --bg-canvas: #ffffff;
-  --bg-elevated: #f5f5f7;
-  --bg-sunken: #ebedf0;
+  --bg-canvas: #f5f4ef;
+  --bg-card: #eae9e2;
+  --bg-elevated: #fbfaf6;
+  --bg-sunken: #f1f0ea;
 
-  --fg-primary: #1d1d1f;
-  --fg-secondary: #6e6e73;
-  --fg-tertiary: #aeaeb2;
+  --fg-primary: #17181a;
+  --fg-secondary: #71737a;
+  --fg-tertiary: #a3a5ab;
 
-  --border: #d2d2d7;
-  --border-focus: #007aff;
+  --border: #e3e1d9;
+  --border-focus: #6fbf3f;
 
-  --brand: #007aff;
-  --brand-hover: #0071e3;
-  --brand-soft: rgba(0, 122, 255, 0.1);
+  --brand: #9be96b;
+  --brand-hover: #8cdf58;
+  --brand-ink: #101408; /* text on brand surfaces — 13:1 contrast */
+  --brand-soft: rgba(155, 233, 107, 0.16);
 
-  --ok: #34c759;
-  --warn: #ff9f0a;
-  --error: #ff3b30;
+  --ok: #3fae4e;
+  --warn: #d97a08;
+  --error: #d64545;
 
-  --accent-from: #ff9f0a;
-  --accent-to: #ff453a;
+  /* Kept for the score-ring / progress accents (was orange→red, now green family) */
+  --accent-from: #b6f28a;
+  --accent-to: #4fae2f;
 
-  --overlay: rgba(0, 0, 0, 0.4);
+  --nav-ink: #1d1f23; /* floating bottom-nav charcoal */
+  --nav-ink-hover: #2a2d33;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
+  --overlay: rgba(23, 24, 26, 0.4);
 
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-pill: 100px;
+  --shadow-sm: 0 1px 3px rgba(30, 32, 25, 0.07);
+  --shadow-md: 0 6px 20px rgba(30, 32, 25, 0.1);
+  --shadow-lg: 0 14px 44px rgba(30, 32, 25, 0.16);
 }
 
 [data-theme='dark'] {
-  --bg-canvas: #000000;
-  --bg-elevated: #1c1c1e;
-  --bg-sunken: #0b0b0d;
+  --bg-canvas: #131416;
+  --bg-card: #1d1f22;
+  --bg-elevated: #26282c;
+  --bg-sunken: #191b1e;
 
-  --fg-primary: #f5f5f7;
-  --fg-secondary: #98989d;
-  --fg-tertiary: #636366;
+  --fg-primary: #f3f2ec;
+  --fg-secondary: #9a9ca2;
+  --fg-tertiary: #63666c;
 
-  --border: #3a3a3c;
-  --border-focus: #409cff;
+  --border: #2e3035;
+  --border-focus: #9be96b;
 
-  --brand: #0a84ff;
-  --brand-hover: #409cff;
-  --brand-soft: rgba(10, 132, 255, 0.16);
+  --brand: #9be96b;
+  --brand-hover: #aef07f;
+  --brand-ink: #101408;
+  --brand-soft: rgba(155, 233, 107, 0.14);
 
-  --ok: #30d158;
-  --warn: #ff9f0a;
-  --error: #ff453a;
+  --ok: #5ec46c;
+  --warn: #e8a03c;
+  --error: #e86a6a;
 
-  --overlay: rgba(0, 0, 0, 0.65);
+  --accent-from: #b6f28a;
+  --accent-to: #6fcf4f;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.55);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.65);
+  --nav-ink: #1d1f23;
+  --nav-ink-hover: #2a2d33;
+
+  --overlay: rgba(0, 0, 0, 0.6);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 14px 44px rgba(0, 0, 0, 0.55);
 }
 
 html {
@@ -83,8 +95,19 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Display headings — heavy, tight, intentional (mockup language) */
+h1,
+h2 {
+  letter-spacing: -0.03em;
+}
+
 ::selection {
   background: var(--brand-soft);
+}
+
+/* Tabular figures for PKR / km / time data */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Slim, themed scrollbars */
@@ -116,7 +139,7 @@ input[type='time']::-webkit-calendar-picker-indicator {
 }
 
 @layer components {
-  /* Gradient accent used for score bars and hero CTAs (matches reference UI) */
+  /* Green accent sweep — used for score bars and progress fills */
   .accent-gradient {
     background-image: linear-gradient(135deg, var(--accent-from), var(--accent-to));
   }

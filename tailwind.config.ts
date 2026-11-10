@@ -18,6 +18,7 @@ const config: Config = {
     extend: {
       colors: {
         canvas: 'var(--bg-canvas)',
+        card: 'var(--bg-card)',
         elevated: 'var(--bg-elevated)',
         sunken: 'var(--bg-sunken)',
         ink: {
@@ -30,7 +31,12 @@ const config: Config = {
         brand: {
           DEFAULT: 'var(--brand)',
           hover: 'var(--brand-hover)',
+          ink: 'var(--brand-ink)',
           soft: 'var(--brand-soft)',
+        },
+        nav: {
+          DEFAULT: 'var(--nav-ink)',
+          hover: 'var(--nav-ink-hover)',
         },
         ok: 'var(--ok)',
         warn: 'var(--warn)',
@@ -49,10 +55,9 @@ const config: Config = {
       },
       fontFamily: {
         sans: [
+          'var(--font-sans, "Satoshi")',
           '-apple-system',
           'BlinkMacSystemFont',
-          '"SF Pro Text"',
-          '"SF Pro Display"',
           '"Segoe UI"',
           'Roboto',
           'Helvetica',

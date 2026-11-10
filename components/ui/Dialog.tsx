@@ -38,7 +38,7 @@ export function DialogContent({
       >
         <div
           className={cn(
-            'relative rounded-2xl border border-line bg-elevated p-6 shadow-float animate-scale-in',
+            'relative rounded-3xl bg-elevated p-6 shadow-float animate-scale-in',
             className,
           )}
         >

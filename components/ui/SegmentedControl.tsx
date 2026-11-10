@@ -38,7 +38,7 @@ export function SegmentedControl<T extends string | number>({
             className={cn(
               'flex-1 rounded-full py-1.5 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]',
               active
-                ? 'bg-elevated text-ink shadow-soft scale-[1.02]'
+                ? 'bg-brand text-brand-ink font-semibold shadow-soft scale-[1.02]'
                 : 'text-ink-secondary hover:text-ink',
             )}
           >
