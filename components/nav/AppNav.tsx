@@ -31,10 +31,10 @@ function NavItem({ href, label, icon: Icon, active }: { href: string; label: str
     <Link
       href={href}
       className={cn(
-        'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-150',
+        'flex items-center gap-2 rounded-pill px-4 py-2 text-sm font-semibold transition-all duration-150',
         active
-          ? 'bg-brand-soft text-brand'
-          : 'text-ink-secondary hover:bg-elevated hover:text-ink',
+          ? 'bg-nav text-brand'
+          : 'text-ink-secondary hover:bg-card hover:text-ink',
       )}
       aria-current={active ? 'page' : undefined}
     >
@@ -70,7 +70,7 @@ function TopBar() {
   }, [supabase])
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-canvas/95 backdrop-blur supports-[backdrop-filter]:bg-canvas/80">
+    <header className="sticky top-0 z-40 bg-canvas/95 backdrop-blur supports-[backdrop-filter]:bg-canvas/80">
       <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-3 px-4">
         {/* Brand */}
         <Link href="/feed" className="flex items-center gap-2.5" aria-label="CoolCarPool home">
@@ -115,7 +115,7 @@ function ThemeButton({ theme, onToggle }: { theme: 'light' | 'dark'; onToggle: (
       type="button"
       onClick={onToggle}
       aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-      className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-elevated text-ink-secondary transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
+      className="flex h-9 w-9 items-center justify-center rounded-full bg-card text-ink-secondary transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
     >
       {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </button>
@@ -149,7 +149,7 @@ function UserMenu({ name, avatarUrl, className }: { name: string; avatarUrl: str
         <>
           {/* Click-away layer */}
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
-          <div className="absolute right-0 z-50 mt-2 w-48 rounded-2xl border border-line bg-elevated p-1.5 shadow-float animate-scale-in">
+          <div className="absolute right-0 z-50 mt-2 w-48 rounded-3xl bg-elevated p-1.5 shadow-float animate-scale-in">
             <Link
               href="/profile"
               onClick={() => setOpen(false)}
@@ -173,16 +173,16 @@ function UserMenu({ name, avatarUrl, className }: { name: string; avatarUrl: str
   )
 }
 
-/** Fixed bottom tab bar for mobile — mirrors the reference app layout. */
+/** Floating charcoal pill tab bar for mobile — the mockup's bottom nav. */
 function TabBar() {
   const pathname = usePathname()
 
   return (
     <nav
       aria-label="Primary mobile"
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-line bg-elevated/95 backdrop-blur md:hidden"
+      className="fixed bottom-4 left-0 right-0 z-40 flex justify-center px-6 md:hidden"
     >
-      <div className="mx-auto grid max-w-md grid-cols-3 px-2 py-1.5">
+      <div className="flex items-center gap-1 rounded-pill bg-nav p-1.5 shadow-float">
         {NAV_LINKS.map((link) => {
           const active = pathname === link.href || pathname.startsWith(`${link.href}/`)
           return (
@@ -191,12 +191,12 @@ function TabBar() {
               href={link.href}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'flex flex-col items-center gap-1 rounded-xl py-1.5 text-[10px] font-medium transition-colors',
-                active ? 'text-brand' : 'text-ink-tertiary',
+                'flex w-[4.5rem] flex-col items-center gap-0.5 rounded-pill py-2 transition-colors duration-150',
+                active ? 'bg-nav-hover text-brand' : 'text-ink-tertiary hover:text-white',
               )}
             >
-              <link.icon className="h-5 w-5" />
-              {link.label}
+              <link.icon className="h-5 w-5" strokeWidth={active ? 2.4 : 2} />
+              <span className="text-[9px] font-semibold tracking-wide">{link.label}</span>
             </Link>
           )
         })}

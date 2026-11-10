@@ -1,10 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { SearchX, Search } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Badge } from '@/components/ui/Badge'
+import { Avatar } from '@/components/ui/Avatar'
 import { TravelCard } from '@/components/travel/TravelCard'
 import type { FeedTravel } from '@/lib/mock-data'
 import type { GenderPreference } from '@/types'
@@ -35,6 +36,9 @@ export interface TravelFeedProps {
   fallback?: boolean
   loading?: boolean
   currentUserId?: string | null
+  /** Viewer's name for the greeting header (mockup: "Good Morning, Ali 👋"). */
+  userName?: string | null
+  userAvatarUrl?: string | null
 }
 
 const GENDER_FILTERS: Array<{ value: GenderFilter; label: string }> = [
@@ -53,8 +57,24 @@ function matches(travel: FeedTravel, f: FeedFilters): boolean {
   return true
 }
 
-export function TravelFeed({ initialTravels, fallback, loading, currentUserId }: TravelFeedProps) {
+export function TravelFeed({
+  initialTravels,
+  fallback,
+  loading,
+  currentUserId,
+  userName,
+  userAvatarUrl,
+}: TravelFeedProps) {
   const [filters, setFilters] = useState<FeedFilters>(INITIAL_FILTERS)
+  const [greeting, setGreeting] = useState('Welcome back')
+
+  // Time-of-day greeting, resolved after mount to avoid SSR hydration drift.
+  useEffect(() => {
+    const h = new Date().getHours()
+    setGreeting(h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening')
+  }, [])
+
+  const firstName = userName?.trim().split(/\s+/)[0] ?? ''
 
   const travels = useMemo(() => {
     const filtered = initialTravels.filter((t) => matches(t, filters))
@@ -70,19 +90,25 @@ export function TravelFeed({ initialTravels, fallback, loading, currentUserId }:
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Heading */}
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink">Find a ride</h1>
-          <p className="text-sm text-ink-secondary">
-            {fallback ? 'Live feed unavailable — showing demo rides.' : 'Share the ride, split the fare.'}
+      {/* Greeting + avatar (mockup header) */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] font-black leading-tight tracking-tight text-ink">
+            {greeting}
+            {firstName ? `, ${firstName} 👋` : ''}
+          </h1>
+          <p className="mt-0.5 text-sm text-ink-secondary">
+            {fallback ? 'Live feed unavailable — showing demo rides.' : 'Where are you heading today?'}
           </p>
         </div>
-        {fallback ? (
-          <Badge variant="warning" size="sm">
-            Demo data mode
-          </Badge>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {fallback ? (
+            <Badge variant="warning" size="sm">
+              Demo data
+            </Badge>
+          ) : null}
+          <Avatar name={userName || 'Traveler'} src={userAvatarUrl} size="lg" />
+        </div>
       </div>
 
       {/* Search */}
@@ -97,7 +123,7 @@ export function TravelFeed({ initialTravels, fallback, loading, currentUserId }:
 
       {/* Quick filters */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1 rounded-pill border border-line bg-elevated p-1">
+        <div className="flex items-center gap-1 rounded-pill bg-card p-1">
           {GENDER_FILTERS.map((g) => (
             <button
               key={g.value}
@@ -105,9 +131,9 @@ export function TravelFeed({ initialTravels, fallback, loading, currentUserId }:
               onClick={() => set('gender', g.value)}
               aria-pressed={filters.gender === g.value}
               className={cn(
-                'rounded-pill px-3 py-1 text-xs font-medium transition-colors',
+                'rounded-pill px-3 py-1.5 text-xs font-semibold transition-colors',
                 filters.gender === g.value
-                  ? 'bg-brand-soft text-brand'
+                  ? 'bg-nav text-brand'
                   : 'text-ink-secondary hover:text-ink',
               )}
             >
@@ -121,7 +147,7 @@ export function TravelFeed({ initialTravels, fallback, loading, currentUserId }:
           value={filters.date}
           onChange={(e) => set('date', e.target.value)}
           aria-label="Filter by departure date"
-          className="h-9 rounded-pill border border-line bg-elevated px-3 text-xs text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-soft"
+          className="h-9 rounded-pill bg-card px-3 text-xs font-medium text-ink outline-none focus:ring-2 focus:ring-brand-soft"
         />
 
         <button
@@ -129,10 +155,10 @@ export function TravelFeed({ initialTravels, fallback, loading, currentUserId }:
           onClick={() => set('seatsOnly', !filters.seatsOnly)}
           aria-pressed={filters.seatsOnly}
           className={cn(
-            'rounded-pill border px-3 py-2 text-xs font-medium transition-colors',
+            'rounded-pill px-3 py-2 text-xs font-semibold transition-colors',
             filters.seatsOnly
-              ? 'border-[color-mix(in_srgb,var(--ok)_35%,transparent)] bg-[color-mix(in_srgb,var(--ok)_12%,transparent)] text-[var(--ok)]'
-              : 'border-line bg-elevated text-ink-secondary hover:text-ink',
+              ? 'bg-nav text-brand'
+              : 'bg-card text-ink-secondary hover:text-ink',
           )}
         >
           Seats available
@@ -142,7 +168,7 @@ export function TravelFeed({ initialTravels, fallback, loading, currentUserId }:
           value={filters.sort}
           onChange={(e) => set('sort', e.target.value as SortKey)}
           aria-label="Sort rides"
-          className="h-9 rounded-pill border border-line bg-elevated px-3 text-xs text-ink outline-none focus:border-brand"
+          className="h-9 rounded-pill bg-card px-3 text-xs font-medium text-ink outline-none focus:ring-2 focus:ring-brand-soft"
         >
           <option value="soonest">Soonest first</option>
           <option value="price">Cheapest first</option>
@@ -152,7 +178,7 @@ export function TravelFeed({ initialTravels, fallback, loading, currentUserId }:
           <button
             type="button"
             onClick={() => setFilters(INITIAL_FILTERS)}
-            className="text-xs font-medium text-brand hover:underline"
+            className="rounded-pill px-3 py-1.5 text-xs font-semibold text-ink-secondary transition-colors hover:text-ink"
           >
             Reset
           </button>
@@ -163,11 +189,11 @@ export function TravelFeed({ initialTravels, fallback, loading, currentUserId }:
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-56 rounded-2xl" />
+            <Skeleton key={i} className="h-56 rounded-3xl" />
           ))}
         </div>
       ) : travels.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line bg-elevated px-6 py-16 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-3xl bg-card px-6 py-16 text-center">
           <SearchX className="h-10 w-10 text-ink-tertiary" aria-hidden />
           <p className="font-medium text-ink">No rides match your search</p>
           <p className="max-w-xs text-sm text-ink-secondary">

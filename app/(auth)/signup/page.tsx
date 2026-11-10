@@ -5,17 +5,18 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Car, Eye, EyeOff, KeyRound, Mail, MapPin, Phone, UserRound } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, KeyRound, Mail, MapPin, Phone, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { useToast } from '@/components/ui/Toast'
 import { createClient } from '@/lib/supabase/client'
 import { PK_CITIES, signupSchema, type SignupValues } from '@/lib/validations'
 import { cn } from '@/lib/utils'
 
 const GENDER_OPTIONS = [
-  { value: 'male' as const, label: 'Male', emoji: '🚹' },
-  { value: 'female' as const, label: 'Female', emoji: '🚺' },
+  { value: 'male' as const, label: 'Male' },
+  { value: 'female' as const, label: 'Female' },
 ]
 
 export default function SignupPage() {
@@ -143,28 +144,12 @@ export default function SignupPage() {
           <p className="mb-1.5 text-[13px] font-medium text-ink-secondary">
             Gender <span className="text-[var(--error)]">*</span>
           </p>
-          <div className="grid grid-cols-2 gap-2">
-            {GENDER_OPTIONS.map((option) => {
-              const active = watch('gender') === option.value
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setValue('gender', option.value, { shouldValidate: true })}
-                  className={cn(
-                    'flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-semibold transition-all',
-                    active
-                      ? 'border-brand bg-brand-soft text-brand'
-                      : 'border-line bg-elevated text-ink-secondary hover:border-brand hover:text-brand',
-                  )}
-                >
-                  <span aria-hidden>{option.emoji}</span>
-                  {option.label}
-                </button>
-              )
-            })}
-          </div>
+          <SegmentedControl
+            ariaLabel="Gender"
+            value={watch('gender') ?? ''}
+            onChange={(v) => setValue('gender', v, { shouldValidate: true })}
+            options={GENDER_OPTIONS}
+          />
           {errors.gender?.message ? (
             <p className="mt-1 text-xs text-[var(--error)]">{errors.gender.message}</p>
           ) : null}
@@ -196,16 +181,17 @@ export default function SignupPage() {
           label="Phone"
           type="tel"
           autoComplete="tel"
-          placeholder="+92 300 1234567"
+          placeholder="300 1234567"
           leftIcon={<Phone className="h-4 w-4" />}
+          rightSlot={<span className="text-sm font-medium text-ink px-2">+92</span>}
           helperText="Visible to ride members only after your seat is accepted"
           {...register('phone')}
           error={errors.phone?.message?.toString()}
         />
 
-        <Button type="submit" loading={formState.isSubmitting} className="mt-1 h-11 w-full">
-          <Car className="h-4 w-4" aria-hidden />
-          Create account
+        <Button type="submit" variant="ink" loading={formState.isSubmitting} className="mt-1 h-11 w-full">
+          Complete Signup
+          <ArrowRight className="h-4 w-4" />
         </Button>
       </form>
 

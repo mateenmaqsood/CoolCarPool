@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { Car, MapPin, Circle } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 
 export interface WaypointForMap {
@@ -165,118 +165,113 @@ export function SVGRouteMap({
 
   return (
     <div className={cn('relative w-full', className)}>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${Math.max(400, dimensions.width || 400)} ${Math.max(160, dimensions.height || 160)}`}
-        preserveAspectRatio="xMidYMid meet"
-        className="w-full h-auto max-h-64"
-        role="img"
-        aria-label={`Route from ${origin} to ${destination}`}
-      >
-        <defs>
-          <linearGradient id="routeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="var(--accent-from)" />
-            <stop offset="100%" stopColor="var(--accent-to)" />
-          </linearGradient>
-          <marker
-            id="arrowhead"
-            markerWidth="10"
-            markerHeight="7"
-            refX="9"
-            refY="3.5"
-            orient="auto"
-            markerUnits="strokeWidth"
-          >
-            <path d="M 0 0 L 10 3.5 L 0 7 Z" fill="var(--brand)" />
-          </marker>
-        </defs>
+      {/* Dark map card (mockup: charcoal panel, glowing green route) */}
+      <div className="overflow-hidden rounded-3xl bg-nav p-4 shadow-card">
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${Math.max(400, dimensions.width || 400)} ${Math.max(160, dimensions.height || 160)}`}
+          preserveAspectRatio="xMidYMid meet"
+          className="w-full h-auto max-h-64"
+          role="img"
+          aria-label={`Route from ${origin} to ${destination}`}
+        >
+          <defs>
+            <linearGradient id="routeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="var(--accent-from)" />
+              <stop offset="100%" stopColor="var(--accent-to)" />
+            </linearGradient>
+            <marker
+              id="arrowhead"
+              markerWidth="10"
+              markerHeight="7"
+              refX="9"
+              refY="3.5"
+              orient="auto"
+              markerUnits="strokeWidth"
+            >
+              <path d="M 0 0 L 10 3.5 L 0 7 Z" fill="var(--brand)" />
+            </marker>
+          </defs>
 
-        {/* Pickup radius circles around waypoints */}
-        {stops.waypoints.map((wp) => (
-          <circle
-            key={wp.id}
-            cx={wp.x}
-            cy={wp.y}
-            r={radiusPixels}
-            fill="var(--brand-soft)"
-            stroke="var(--brand)"
-            strokeWidth="1"
-            strokeDasharray="4 4"
-            opacity={0.3}
-            className="transition-opacity hover:opacity-60"
+          {/* Pickup radius circles around waypoints */}
+          {stops.waypoints.map((wp) => (
+            <circle
+              key={wp.id}
+              cx={wp.x}
+              cy={wp.y}
+              r={radiusPixels}
+              fill="var(--brand-soft)"
+              stroke="var(--brand)"
+              strokeWidth="1"
+              strokeDasharray="4 4"
+              opacity={0.35}
+              className="transition-opacity hover:opacity-70"
+            />
+          ))}
+
+          {/* Route path */}
+          <path
+            ref={pathRef}
+            d={pathData}
+            fill="none"
+            stroke="url(#routeGradient)"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            markerEnd="url(#arrowhead)"
+            className="drop-shadow-[0_2px_8px_rgba(155,233,107,0.45)]"
           />
-        ))}
 
-        {/* Route path */}
-        <path
-          ref={pathRef}
-          d={pathData}
-          fill="none"
-          stroke="url(#routeGradient)"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          markerEnd="url(#arrowhead)"
-          className="filter drop-shadow-[0_2px_4px_rgba(0,122,255,0.3)]"
-        />
-
-        {/* Origin marker */}
-        <g transform={`translate(${stops.origin.x}, ${stops.origin.y})`}>
-          <circle
-            cx="0"
-            cy="0"
-            r="14"
-            fill="var(--brand)"
-            className="shadow-soft"
-          />
-          <MapPin
-            className="absolute -translate-x-1/2 -translate-y-[18px] left-1/2 text-white"
-            size={14}
-            strokeWidth={2.5}
-          />
-        </g>
-
-        {/* Waypoint markers */}
-        {stops.waypoints.map((wp) => (
-          <g key={wp.id} transform={`translate(${wp.x}, ${wp.y})`}>
+          {/* Origin marker */}
+          <g transform={`translate(${stops.origin.x}, ${stops.origin.y})`}>
             <circle
               cx="0"
               cy="0"
-              r="10"
-              fill="var(--bg-elevated)"
-              stroke="var(--brand)"
+              r="12"
+              fill="#2a2d33"
+              stroke="#9a9ca2"
               strokeWidth="2.5"
-              className="shadow-sm"
             />
-            <Circle className="absolute -translate-x-1/2 -translate-y-1/2 left-1/2 top-1/2 text-brand" size={6} strokeWidth={2} />
-            <text
-              x="0"
-              y="-16"
-              textAnchor="middle"
-              className="text-[10px] font-medium text-ink-secondary whitespace-nowrap"
-              style={{ fontFamily: 'inherit' }}
-            >
-              {wp.label}
-            </text>
           </g>
-        ))}
 
-        {/* Destination marker */}
-        <g transform={`translate(${stops.destination.x}, ${stops.destination.y})`}>
-          <circle
-            cx="0"
-            cy="0"
-            r="14"
-            fill="var(--ok)"
-            className="shadow-soft"
-          />
-          <MapPin
-            className="absolute -translate-x-1/2 -translate-y-[18px] left-1/2 text-white"
-            size={14}
-            strokeWidth={2.5}
-          />
-        </g>
-      </svg>
+          {/* Waypoint markers */}
+          {stops.waypoints.map((wp) => (
+            <g key={wp.id} transform={`translate(${wp.x}, ${wp.y})`}>
+              <circle
+                cx="0"
+                cy="0"
+                r="10"
+                fill="#1d1f23"
+                stroke="var(--brand)"
+                strokeWidth="2.5"
+              />
+              <circle cx="0" cy="0" r="3" fill="var(--brand)" />
+              <text
+                x="0"
+                y="-16"
+                textAnchor="middle"
+                fill="#9a9ca2"
+                className="text-[10px] font-medium whitespace-nowrap"
+                style={{ fontFamily: 'inherit' }}
+              >
+                {wp.label}
+              </text>
+            </g>
+          ))}
+
+          {/* Destination marker — the glowing green pin */}
+          <g transform={`translate(${stops.destination.x}, ${stops.destination.y})`}>
+            <circle
+              cx="0"
+              cy="0"
+              r="14"
+              fill="var(--brand)"
+              className="drop-shadow-[0_0_10px_rgba(155,233,107,0.8)]"
+            />
+            <circle cx="0" cy="0" r="4.5" fill="var(--brand-ink)" />
+          </g>
+        </svg>
+      </div>
 
       {/* Legend / Labels below */}
       <div className="mt-4 flex flex-col gap-2 text-xs text-ink-secondary">
@@ -304,6 +299,3 @@ export function SVGRouteMap({
     </div>
   )
 }
-
-import { useMemo } from 'react'
-import { Badge } from '@/components/ui/Badge'

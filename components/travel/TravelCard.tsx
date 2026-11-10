@@ -32,7 +32,7 @@ export function GenderBadge({ preference, className }: { preference: GenderPrefe
   )
 }
 
-function SeatsPill({ available, total }: { available: number; total: number }) {
+function SeatsPill({ available }: { available: number }) {
   if (available <= 0) {
     return (
       <Badge variant="danger" size="sm" icon={<Users className="h-3 w-3" />}>
@@ -41,8 +41,8 @@ function SeatsPill({ available, total }: { available: number; total: number }) {
     )
   }
   return (
-    <Badge variant={available <= 1 ? 'warning' : 'default'} size="sm" icon={<Users className="h-3 w-3" />}>
-      {available}/{total} seats left
+    <Badge variant="gradient" size="sm" icon={<Users className="h-3 w-3" />}>
+      {available} {available === 1 ? 'Seat' : 'Seats'} Left
     </Badge>
   )
 }
@@ -86,11 +86,10 @@ export function TravelCard({ travel, isOwn, className }: TravelCardProps) {
     <Link
       href={`/travel/${travel.id}`}
       className={cn(
-        'group flex flex-col gap-4 rounded-2xl border border-line bg-elevated p-5 shadow-soft transition-all duration-200',
-        'hover:-translate-y-0.5 hover:shadow-card hover:border-[color-mix(in_srgb,var(--brand)_45%,var(--border))]',
+        'group flex flex-col gap-4 rounded-3xl bg-card p-5 shadow-soft transition-all duration-200',
+        'hover:-translate-y-0.5 hover:shadow-card',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]',
         isFull && 'opacity-70',
-        isOwn && 'border-[color-mix(in_srgb,var(--brand)_55%,var(--border))]',
         className,
       )}
       aria-label={`Travel from ${travel.origin_text} to ${travel.destination_text}`}
@@ -119,7 +118,7 @@ export function TravelCard({ travel, isOwn, className }: TravelCardProps) {
           <Badge variant="outline" size="sm" icon={<CalendarDays className="h-3 w-3" />}>
             {formatDeparture(travel.departure_at)}
           </Badge>
-          <SeatsPill available={travel.available_seats} total={travel.total_seats} />
+          <SeatsPill available={travel.available_seats} />
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <Wallet className="h-3.5 w-3.5 text-ink-tertiary" aria-hidden />
@@ -137,7 +136,7 @@ export function TravelCard({ travel, isOwn, className }: TravelCardProps) {
         <span
           className={cn(
             'inline-flex items-center gap-1 rounded-pill px-3 py-1.5 text-xs font-semibold transition-colors',
-            isFull ? 'bg-sunken text-ink-tertiary' : 'bg-brand text-white group-hover:bg-brand-hover',
+            isFull ? 'bg-sunken text-ink-tertiary' : 'bg-brand text-brand-ink group-hover:bg-brand-hover',
           )}
         >
           {isFull ? 'Ride full' : isOwn ? 'View ride' : 'Request seat'}

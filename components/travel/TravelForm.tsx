@@ -44,9 +44,8 @@ import { cn, formatPKR, combineDateAndTime } from '@/lib/utils'
 
 const STEPS = [
   { label: 'Route', icon: MapPin },
-  { label: 'Schedule', icon: CalendarClock },
   { label: 'Details', icon: SlidersHorizontal },
-  { label: 'Review', icon: ClipboardCheck },
+  { label: 'Post', icon: ClipboardCheck },
 ] as const
 
 function Stepper({ current }: { current: number }) {
@@ -55,36 +54,30 @@ function Stepper({ current }: { current: number }) {
       {STEPS.map((step, i) => {
         const done = i < current
         const active = i === current
+        const nodeClass = done
+          ? 'border-transparent bg-brand text-brand-ink'
+          : 'border-line bg-elevated text-ink-tertiary'
+        const ringClass = active ? 'ring-2 ring-[var(--border-focus)] ring-offset-2 ring-offset-canvas' : ''
+        const lineClass = i < current ? 'bg-brand' : 'bg-[var(--border)]'
+
         return (
           <li key={step.label} className="flex flex-1 flex-col items-center gap-1.5">
             <div className="flex w-full items-center gap-1.5">
-              {/* Connector before node (except first) handled by flex-1 line below */}
               <span
                 aria-hidden
                 className={cn(
                   'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-all duration-200',
-                  done && 'border-transparent bg-brand text-white',
-                  active && 'border-transparent accent-gradient text-white shadow-soft',
-                  !done && !active && 'border-line bg-elevated text-ink-tertiary',
+                  nodeClass,
+                  ringClass,
                 )}
               >
                 {done ? <Check className="h-4 w-4" /> : <step.icon className="h-4 w-4" />}
               </span>
               {i < STEPS.length - 1 ? (
-                <span
-                  className={cn(
-                    'h-0.5 flex-1 rounded-full transition-colors duration-300',
-                    i < current ? 'bg-brand' : 'bg-[var(--border)]',
-                  )}
-                />
+                <span className={cn('h-0.5 flex-1 rounded-full transition-colors duration-300', lineClass)} />
               ) : null}
             </div>
-            <span
-              className={cn(
-                'text-[10px] font-medium tracking-wide uppercase',
-                active ? 'text-ink' : 'text-ink-tertiary',
-              )}
-            >
+            <span className={cn('text-[10px] font-semibold tracking-wide uppercase', active ? 'text-ink' : 'text-ink-tertiary')}>
               {step.label}
             </span>
           </li>
@@ -132,10 +125,10 @@ function CityPills({ onSelect, selected }: { onSelect: (city: string) => void; s
             onClick={() => onSelect(city)}
             aria-pressed={active}
             className={cn(
-              'rounded-pill border px-3 py-1.5 text-xs font-medium transition-all duration-150',
+              'rounded-pill px-3 py-1.5 text-xs font-semibold transition-colors',
               active
-                ? 'border-transparent bg-brand text-white shadow-soft'
-                : 'border-line bg-elevated text-ink-secondary hover:border-brand hover:text-brand',
+                ? 'bg-nav text-brand'
+                : 'bg-card text-ink-secondary hover:text-ink',
             )}
           >
             {city}
@@ -455,7 +448,7 @@ export function TravelForm() {
           e.preventDefault()
           void submitTravel()
         }}
-        className="rounded-2xl border border-line bg-elevated p-6 shadow-soft"
+        className="rounded-3xl bg-card p-6 shadow-soft"
       >
         {/* key={step} re-runs the entrance animation per step */}
         <div key={step} className="flex flex-col gap-5 animate-slide-up">
@@ -509,7 +502,7 @@ export function TravelForm() {
                 />
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-line bg-sunken px-4 py-3">
+              <div className="flex items-center justify-between rounded-2xl bg-elevated p-3">
                 <div>
                   <p className="text-sm font-medium text-ink">Recurring ride</p>
                   <p className="text-xs text-ink-secondary">Repeat this ride on chosen days</p>
@@ -537,10 +530,10 @@ export function TravelForm() {
                           aria-pressed={Boolean(active)}
                           onClick={() => toggleDay(day)}
                           className={cn(
-                            'w-12 rounded-xl border py-2 text-xs font-semibold transition-all',
+                            'w-12 rounded-pill py-2 text-xs font-semibold transition-all',
                             active
-                              ? 'border-transparent bg-brand text-white'
-                              : 'border-line bg-elevated text-ink-secondary hover:border-brand',
+                              ? 'bg-nav text-brand'
+                              : 'bg-card text-ink-secondary hover:text-ink',
                           )}
                         >
                           {day}
@@ -577,7 +570,7 @@ export function TravelForm() {
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
-                  <div className="flex h-10 w-20 items-center justify-center rounded-xl border border-line bg-elevated font-semibold text-ink">
+                  <div className="flex h-10 w-20 items-center justify-center rounded-pill bg-nav text-brand font-semibold">
                     {values.total_seats}
                   </div>
                   <Button
@@ -598,33 +591,15 @@ export function TravelForm() {
                 </div>
               </div>
 
-              {/* Gender preference */}
+              {/* Gender preference — SegmentedControl (Male/Female/Any green active) */}
               <div>
                 <p className="mb-1.5 text-[13px] font-medium text-ink-secondary">Who can join?</p>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {GENDER_PREFERENCE_OPTIONS.map((option) => {
-                    const active = values.gender_preference === option.value
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => setValue('gender_preference', option.value, { shouldValidate: true })}
-                        className={cn(
-                          'flex flex-col items-start gap-0.5 rounded-xl border p-3 text-left transition-all',
-                          active
-                            ? 'border-brand bg-brand-soft'
-                            : 'border-line bg-elevated hover:border-[color-mix(in_srgb,var(--brand)_40%,var(--border))]',
-                        )}
-                      >
-                        <span className={cn('text-sm font-semibold', active ? 'text-brand' : 'text-ink')}>
-                          {option.label}
-                        </span>
-                        <span className="text-[11px] leading-snug text-ink-secondary">{option.hint}</span>
-                      </button>
-                    )
-                  })}
-                </div>
+                <SegmentedControl
+                  ariaLabel="Gender preference"
+                  value={values.gender_preference}
+                  onChange={(v) => setValue('gender_preference', v, { shouldValidate: true })}
+                  options={GENDER_PREFERENCE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                />
               </div>
 
               {/* Pickup radius */}
@@ -669,7 +644,7 @@ export function TravelForm() {
                 One last look
               </div>
 
-              <dl className="flex flex-col divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-line bg-sunken">
+              <dl className="flex flex-col divide-y divide-line overflow-hidden rounded-3xl bg-elevated">
                 <ReviewRow label="Route" value={`${values.origin} → ${values.destination}`} onEdit={() => setStep(0)} />
                 <ReviewRow
                   label="Departure"
@@ -696,7 +671,7 @@ export function TravelForm() {
               </dl>
 
               {/* Vehicle info (read-only from profile) */}
-              <div className="flex items-start gap-3 rounded-xl border border-line bg-sunken p-4">
+              <div className="flex items-start gap-3 rounded-3xl bg-elevated p-4">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft">
                   <Car className="h-4 w-4 text-brand" />
                 </span>
@@ -719,7 +694,7 @@ export function TravelForm() {
         </div>
 
         {/* Wizard controls */}
-        <div className="mt-6 flex items-center justify-between gap-3 border-t border-line pt-5">
+        <div className="mt-6 flex items-center justify-between gap-3 pt-5">
           <Button
             type="button"
             variant="ghost"

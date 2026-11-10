@@ -22,13 +22,18 @@ export default async function FeedPage() {
 
   let travels: FeedTravel[] = []
   let fallback = false
+  let userName: string | null = null
+  let userAvatarUrl: string | null = null
 
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('gender')
+      .select('gender, full_name, avatar_url')
       .eq('id', user.id)
       .single()
+
+    userName = (profile?.full_name as string | null) ?? null
+    userAvatarUrl = (profile?.avatar_url as string | null) ?? null
 
     const { data: rows, error } = await supabase
       .from('travels')
@@ -52,6 +57,12 @@ export default async function FeedPage() {
   }
 
   return (
-    <TravelFeed initialTravels={travels} fallback={fallback} currentUserId={user?.id ?? null} />
+    <TravelFeed
+      initialTravels={travels}
+      fallback={fallback}
+      currentUserId={user?.id ?? null}
+      userName={userName}
+      userAvatarUrl={userAvatarUrl}
+    />
   )
 }

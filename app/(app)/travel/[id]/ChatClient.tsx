@@ -160,9 +160,9 @@ export function ChatClient({ travel, members, messages, currentUserId, isHost }:
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] min-h-[500px] max-h-[80vh] bg-elevated rounded-2xl border border-line overflow-hidden flex-1">
+    <div className="flex flex-col h-[calc(100vh-200px)] min-h-[500px] max-h-[80vh] bg-card rounded-3xl shadow-soft overflow-hidden flex-1">
       {/* Chat Header */}
-      <div className="flex items-center justify-between border-b border-line bg-sunken px-4 py-3">
+      <div className="flex items-center justify-between border-b border-line bg-elevated px-4 py-3">
         <div className="flex items-center gap-3">
           <Link href={`/travel/${travel.id}`} className="p-1 rounded-lg text-ink-tertiary hover:bg-elevated transition-colors">
             <ChevronLeft className="h-5 w-5" />
@@ -222,10 +222,10 @@ export function ChatClient({ travel, members, messages, currentUserId, isHost }:
                   className={cn(
                     'rounded-2xl px-4 py-2 text-sm leading-relaxed',
                     type === 'self'
-                      ? 'bg-brand text-white rounded-br-md'
+                      ? 'bg-brand text-brand-ink rounded-br-md'
                       : type === 'system'
                       ? 'bg-sunken text-center text-ink-secondary italic px-3 py-1 text-xs'
-                      : 'bg-white dark:bg-slate-800 text-ink rounded-bl-md shadow-sm'
+                      : 'bg-elevated text-ink rounded-bl-md shadow-sm'
                   )}
                 >
                   {msg.content}
@@ -244,7 +244,7 @@ export function ChatClient({ travel, members, messages, currentUserId, isHost }:
       </div>
 
       {/* Message Input */}
-      <div className="border-t border-line bg-sunken px-4 py-3">
+      <div className="border-t border-line bg-elevated px-4 py-3">
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}
@@ -253,7 +253,7 @@ export function ChatClient({ travel, members, messages, currentUserId, isHost }:
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             rows={1}
-            className="flex-1 min-h-[44px] max-h-[120px] rounded-xl border border-line bg-elevated px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-soft resize-none"
+            className="flex-1 min-h-[44px] max-h-[120px] rounded-xl bg-card px-3 py-2 text-sm text-ink outline-none focus:ring-2 focus:ring-brand-soft resize-none"
             aria-label="Message"
             style={{ overflow: 'hidden' }}
           />

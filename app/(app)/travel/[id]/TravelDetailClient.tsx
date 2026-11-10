@@ -193,64 +193,71 @@ export function TravelDetailClient({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-sm text-ink-secondary mb-2">
-            <MapPin className="h-4 w-4 text-brand" />
-            <span className="font-medium text-ink truncate">
-              {travel.origin_text} → {travel.destination_text}
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink">
-            {travel.origin_text} → {travel.destination_text}
-          </h1>
-          <p className="mt-1 text-sm text-ink-secondary">
-            {travel.description ?? 'No description provided'}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <Badge variant="outline" size="sm" icon={<CalendarDays className="h-3 w-3" />}>
-            {formatDeparture(travel.departure_at)}
-          </Badge>
-          <Badge variant={genderBadgeVariant} size="sm">
-            {travel.gender_preference.replace('_', ' ')}
-          </Badge>
-          <Badge variant={isLocked ? 'danger' : 'success'} size="sm" icon={isLocked ? <Lock className="h-3 w-3" /> : <Users className="h-3 w-3" />}>
-            {isLocked ? travel.status : `${travel.available_seats}/${travel.total_seats} seats`}
-          </Badge>
-        </div>
+      {/* Back + host avatar (mockup header) */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          aria-label="Go back"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-card text-ink transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
+        >
+          <ChevronRight className="h-5 w-5 rotate-180" />
+        </button>
+        <Avatar name={host.full_name} src={host.avatar_url} size="md" presence="online" />
       </div>
 
-      {/* Meta Row */}
-      <div className="flex flex-wrap items-center gap-3 text-sm">
+      {/* Title */}
+      <div>
+        <h1 className="text-[26px] font-black leading-tight tracking-tight text-ink">
+          {travel.origin_text} → {travel.destination_text}
+        </h1>
+        <p className="mt-1 text-sm text-ink-secondary">
+          {travel.description ?? 'No description provided'}
+        </p>
+      </div>
+
+      {/* Meta chips */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="outline" size="sm" icon={<CalendarDays className="h-3 w-3" />}>
+          {formatDeparture(travel.departure_at)}
+        </Badge>
+        <Badge variant={genderBadgeVariant} size="sm">
+          {travel.gender_preference.replace('_', ' ')}
+        </Badge>
+        <Badge
+          variant={isLocked ? 'danger' : 'gradient'}
+          size="sm"
+          icon={isLocked ? <Lock className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+        >
+          {isLocked ? travel.status : `${travel.available_seats} Seats Left`}
+        </Badge>
+      </div>
+
+      {/* Host + stats row */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
         <div className="flex items-center gap-2">
-          <Avatar name={host.full_name} src={host.avatar_url} size="sm" />
           <div>
-            <p className="font-medium text-ink">{host.full_name} {isCurrentUserHost ? '(you)' : ''}</p>
-            <p className="text-ink-secondary">{timeUntil(travel.departure_at)}</p>
+            <p className="font-semibold text-ink">{host.full_name} {isCurrentUserHost ? '(you)' : ''}</p>
+            <p className="text-xs text-ink-secondary">{timeUntil(travel.departure_at)}</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 text-ink-secondary">
           <Wallet className="h-4 w-4" />
-          <span className="font-semibold text-ink">{formatPKR(travel.estimated_cost_pkr ?? 0)}</span>
+          <span className="font-semibold tabular text-ink">{formatPKR(travel.estimated_cost_pkr ?? 0)}</span>
         </div>
         <div className="flex items-center gap-1.5 text-ink-secondary">
           <Car className="h-4 w-4" />
-          <span>{Math.round(travel.total_km)} km</span>
+          <span className="tabular">{Math.round(travel.total_km)} km</span>
         </div>
         {isCurrentUserHost && (
-          <div className="ml-auto flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={handleShare} aria-label="Share">
-              <Share2 className="h-4 w-4" />
-            </Button>
-          </div>
+          <Button variant="ghost" size="icon" onClick={handleShare} aria-label="Share" className="ml-auto">
+            <Share2 className="h-4 w-4" />
+          </Button>
         )}
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex border-b border-line" role="tablist">
+      <div className="flex gap-1 rounded-pill bg-card p-1" role="tablist">
         {TABS.map((tab) => (
           <button
             key={tab}
@@ -258,14 +265,14 @@ export function TravelDetailClient({
             aria-selected={activeTab === tab}
             onClick={() => setActiveTab(tab)}
             className={cn(
-              'px-4 py-3 text-sm font-medium border-b-2 transition-colors',
+              'flex-1 rounded-pill px-4 py-2 text-sm font-semibold transition-colors',
               activeTab === tab
-                ? 'border-brand text-brand'
-                : 'border-transparent text-ink-secondary hover:text-ink hover:border-line'
+                ? 'bg-nav text-brand'
+                : 'text-ink-secondary hover:text-ink',
             )}
           >
             {tab === 'Chat' ? (
-              <span className="flex items-center gap-1.5">
+              <span className="flex items-center justify-center gap-1.5">
                 <MessageCircle className="h-4 w-4" />
                 Chat
               </span>
@@ -303,10 +310,10 @@ export function TravelDetailClient({
                     {waypoints.map((wp) => (
                       <div
                         key={wp.id}
-                        className="flex items-center justify-between p-3 rounded-xl border border-line bg-sunken"
+                        className="flex items-center justify-between rounded-2xl bg-elevated p-3"
                       >
                         <div className="flex items-center gap-3">
-                          <span className="w-8 h-8 rounded-full bg-brand-soft flex items-center justify-center text-brand text-sm font-semibold">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-sm font-bold text-brand-ink">
                             {wp.sort_order + 1}
                           </span>
                           <div>
@@ -386,7 +393,7 @@ export function TravelDetailClient({
                     {pendingRequests.map((req) => (
                       <div
                         key={req.id}
-                        className="flex items-center justify-between p-3 rounded-xl border border-line bg-sunken"
+                        className="flex items-center justify-between rounded-2xl bg-elevated p-3"
                       >
                         <div className="flex items-center gap-3">
                           <Avatar
@@ -465,6 +472,19 @@ export function TravelDetailClient({
           </Card>
         )}
       </div>
+
+      {/* Sticky green CTA — visible only to eligible viewers */}
+      {canJoin && (
+        <div className="fixed bottom-20 left-0 right-0 z-30 flex justify-center px-4 md:bottom-6">
+          <Button
+            size="lg"
+            onClick={() => setShowJoinModal(true)}
+            className="w-full max-w-md shadow-float"
+          >
+            Request to Join
+          </Button>
+        </div>
+      )}
 
       {/* Lock Confirm Dialog */}
       <Dialog open={showLockConfirm} onOpenChange={setShowLockConfirm}>

@@ -118,11 +118,11 @@ export function SeatMap({
 
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-3 text-xs text-ink-secondary">
-        <SeatLegendItem color="bg-gradient-to-br from-amber-500 to-amber-600" label="Host" icon={<Crown className="h-3 w-3" />} />
-        <SeatLegendItem color="bg-emerald-500" label="Occupied" icon={<CheckCircle2 className="h-3 w-3" />} />
-        <SeatLegendItem color="bg-sky-500" label="Mid-route" icon={<MapPin className="h-3 w-3" />} />
-        <SeatLegendItem color="bg-slate-200 dark:bg-slate-700" label="Available" icon={<User className="h-3 w-3 text-slate-400" />} />
-        <span className="ml-auto text-sm font-medium text-ink">
+        <SeatLegendItem color="bg-brand" label="Host" icon={<Crown className="h-3 w-3 text-brand-ink" />} />
+        <SeatLegendItem color="bg-nav" label="Occupied" icon={<CheckCircle2 className="h-3 w-3 text-white" />} />
+        <SeatLegendItem color="bg-brand-soft" label="Mid-route" icon={<MapPin className="h-3 w-3 text-[var(--ok)]" />} />
+        <SeatLegendItem color="bg-elevated" label="Available" icon={<User className="h-3 w-3 text-ink-tertiary" />} />
+        <span className="ml-auto text-sm font-semibold tabular text-ink">
           {availableCount}/{travel.total_seats} seats left
         </span>
       </div>
@@ -181,15 +181,15 @@ function SeatCard({ seat, travel, isSelected, onClick, disabled, isHost }: SeatC
   const getSeatStyle = () => {
     switch (type) {
       case 'host':
-        return 'bg-gradient-to-br from-amber-500 to-amber-600 text-white border-amber-500'
+        return 'bg-brand text-brand-ink shadow-soft'
       case 'occupied':
-        return 'bg-emerald-500 text-white border-emerald-500'
+        return 'bg-nav text-white'
       case 'mid-route':
-        return 'bg-sky-500 text-white border-sky-500'
+        return 'bg-brand-soft text-ink'
       case 'available':
         return disabled
-          ? 'bg-slate-100 dark:bg-slate-800 text-slate-300 border-slate-200 dark:border-slate-700 cursor-not-allowed'
-          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-brand hover:shadow-md cursor-pointer transition-all'
+          ? 'bg-sunken text-ink-tertiary cursor-not-allowed'
+          : 'bg-elevated text-ink-secondary hover:text-ink hover:shadow-card cursor-pointer transition-all'
     }
   }
 
@@ -215,16 +215,16 @@ function SeatCard({ seat, travel, isSelected, onClick, disabled, isHost }: SeatC
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'relative group h-24 sm:h-28 rounded-2xl border-2 p-3 flex flex-col items-center justify-center gap-2 transition-all duration-200',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
+        'relative group h-24 sm:h-28 rounded-3xl p-3 flex flex-col items-center justify-center gap-2 transition-all duration-200',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-2',
         'active:scale-[0.98]',
         getSeatStyle(),
-        isSelected && 'ring-2 ring-brand ring-offset-2 scale-105'
+        isSelected && 'ring-2 ring-[var(--border-focus)] ring-offset-2 scale-105'
       )}
       aria-label={type === 'available' ? `Request seat ${seat.index + 1}` : `Seat ${seat.index + 1}: ${type}`}
     >
       <div className="flex flex-col items-center gap-1">
-        <div className={cn('w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center', type === 'available' ? 'bg-slate-100 dark:bg-slate-800' : 'bg-white/20')}>
+        <div className={cn('flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center overflow-hidden rounded-2xl', type === 'available' ? 'bg-sunken' : 'bg-white/20')}>
           {member && member.profile?.avatar_url ? (
             <img
               src={member.profile.avatar_url}
@@ -301,7 +301,7 @@ function JoinRequestModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-line bg-elevated p-6 shadow-float animate-scale-in">
+      <div className="w-full max-w-md rounded-3xl bg-elevated p-6 shadow-float animate-scale-in">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-ink">Request to Join</h2>
           <button
@@ -322,7 +322,7 @@ function JoinRequestModal({
           <fieldset>
             <legend className="text-sm font-medium text-ink mb-2">How would you like to join?</legend>
             <div className="space-y-2">
-              <label className="flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-colors hover:border-brand hover:bg-brand-soft/20">
+              <label className="flex items-center gap-3 rounded-2xl bg-card p-3 cursor-pointer transition-colors hover:ring-2 hover:ring-brand-soft">
                 <input
                   type="radio"
                   name="joinType"
@@ -331,7 +331,7 @@ function JoinRequestModal({
                   onChange={() => onWaypointChange(null)}
                   className="sr-only peer"
                 />
-                <div className="w-5 h-5 rounded-full border-2 border-line peer-checked:border-brand peer-checked:bg-brand peer-checked:after:content-[''] peer-checked:after:w-1.5 peer-checked:after:h-1.5 peer-checked:after:rounded-full peer-checked:after:bg-white peer-checked:after:block peer-checked:after:mx-auto peer-checked:after:mt-0.5 flex items-center justify-center transition-all" />
+                <div className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-line transition-all peer-checked:border-brand peer-checked:bg-brand peer-checked:after:content-[''] peer-checked:after:block peer-checked:after:h-1.5 peer-checked:after:w-1.5 peer-checked:after:rounded-full peer-checked:after:bg-brand-ink" />
                 <div className="flex-1">
                   <p className="font-medium text-ink">Full route</p>
                   <p className="text-xs text-ink-secondary">Origin to destination ({Math.round(travel.total_km)} km)</p>
@@ -339,7 +339,7 @@ function JoinRequestModal({
               </label>
 
               {waypoints.map((wp) => (
-                <label key={wp.id} className="flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-colors hover:border-brand hover:bg-brand-soft/20">
+                <label key={wp.id} className="flex items-center gap-3 rounded-2xl bg-card p-3 cursor-pointer transition-colors hover:ring-2 hover:ring-brand-soft">
                   <input
                     type="radio"
                     name="joinType"
@@ -348,7 +348,7 @@ function JoinRequestModal({
                     onChange={() => onWaypointChange(wp.id)}
                     className="sr-only peer"
                   />
-                  <div className="w-5 h-5 rounded-full border-2 border-line peer-checked:border-brand peer-checked:bg-brand peer-checked:after:content-[''] peer-checked:after:w-1.5 peer-checked:after:h-1.5 peer-checked:after:rounded-full peer-checked:after:bg-white peer-checked:after:block peer-checked:after:mx-auto peer-checked:after:mt-0.5 flex items-center justify-center transition-all" />
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-line transition-all peer-checked:border-brand peer-checked:bg-brand peer-checked:after:content-[''] peer-checked:after:block peer-checked:after:h-1.5 peer-checked:after:w-1.5 peer-checked:after:rounded-full peer-checked:after:bg-brand-ink" />
                   <div className="flex-1">
                     <p className="font-medium text-ink">Mid-route: {wp.label}</p>
                     <p className="text-xs text-ink-secondary">
@@ -369,7 +369,7 @@ function JoinRequestModal({
               value={message}
               onChange={(e) => onMessageChange(e.target.value)}
               rows={3}
-              className="w-full rounded-xl border border-line bg-sunken px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-soft resize-none"
+              className="w-full rounded-2xl bg-card px-4 py-3 text-sm text-ink outline-none focus:ring-2 focus:ring-brand-soft resize-none"
               placeholder="Hi! I'd like to join your ride..."
             />
           </div>

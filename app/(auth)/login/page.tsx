@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff, KeyRound, Mail } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, KeyRound, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toast'
@@ -85,8 +85,9 @@ function LoginCard() {
           </button>
         </div>
 
-        <Button type="submit" loading={form.formState.isSubmitting} className="mt-1 h-11 w-full">
+        <Button type="submit" variant="ink" loading={form.formState.isSubmitting} className="mt-1 h-11 w-full">
           Log in
+          <ArrowRight className="h-4 w-4" />
         </Button>
       </form>
 
