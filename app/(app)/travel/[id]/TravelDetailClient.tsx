@@ -23,9 +23,14 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Dialog, DialogContent } from '@/components/ui/Dialog'
 import { SeatMap } from '@/components/travel/SeatMap'
-import { SVGRouteMap } from '@/components/route/SVGRouteMap'
+import dynamic from 'next/dynamic'
 import { JoinRequestModal } from '@/components/travel/JoinRequestModal'
 import { useToast } from '@/components/ui/Toast'
+
+const LeafletRouteMap = dynamic(
+  () => import('@/components/route/LeafletRouteMap').then(m => ({ default: m.LeafletRouteMap })),
+  { loading: () => <div className="h-96 animate-pulse rounded-2xl bg-elevated" />, ssr: false }
+)
 import { createClient } from '@/lib/supabase/client'
 import type { Travel, TravelMember, Waypoint, Profile } from '@/types'
 import { cn, formatPKR, formatDeparture, timeUntil, initials } from '@/lib/utils'
@@ -292,13 +297,12 @@ export function TravelDetailClient({
         {/* Route Tab */}
         {activeTab === 'Route' && (
           <div className="space-y-5">
-            <SVGRouteMap
+            <LeafletRouteMap
               origin={travel.origin_text}
               destination={travel.destination_text}
               waypoints={waypoints}
               totalKm={travel.total_km}
               pickupRadiusKm={travel.pickup_radius_km}
-              animate
             />
 
             {waypoints.length > 0 && (

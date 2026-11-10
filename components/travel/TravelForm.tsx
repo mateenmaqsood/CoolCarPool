@@ -27,6 +27,12 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { DuplicateModal, SimilarRidesBanner, type DuplicateMatchView } from '@/components/travel/DuplicateModal'
 import { useToast } from '@/components/ui/Toast'
 import { createClient } from '@/lib/supabase/client'
+import dynamic from 'next/dynamic'
+
+const LeafletRouteMap = dynamic(
+  () => import('@/components/route/LeafletRouteMap').then(m => ({ default: m.LeafletRouteMap })),
+  { loading: () => <div className="h-96 animate-pulse rounded-2xl bg-elevated" />, ssr: false }
+)
 import {
   PK_CITIES,
   RECURRENCE_DAYS,
@@ -495,6 +501,18 @@ export function TravelForm() {
                 selected={values.destination ?? ''}
                 onSelect={(city) => setValue('destination', city, { shouldValidate: true })}
               />
+              {(values.origin?.trim() && values.destination?.trim()) && (
+                <div className="mt-4 pt-4 border-t border-line">
+                  <p className="text-sm font-medium text-ink-secondary mb-2">Route Preview</p>
+                  <LeafletRouteMap
+                    origin={values.origin.trim()}
+                    destination={values.destination.trim()}
+                    waypoints={[]}
+                    totalKm={0}
+                    onRouteCalculated={(km) => setRouteKm(km)}
+                  />
+                </div>
+              )}
             </>
           ) : null}
 
