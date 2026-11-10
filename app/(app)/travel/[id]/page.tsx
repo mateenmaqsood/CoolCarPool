@@ -69,6 +69,18 @@ async function getWaypoints(travelId: string) {
   return data
 }
 
+async function getPendingRequests(travelId: string, isHost: boolean) {
+  if (!isHost) return []
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('travel_requests')
+    .select('*, requester:profiles!travel_requests_requester_id_fkey(id, full_name, avatar_url, gender, city)')
+    .eq('travel_id', travelId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true })
+  return data ?? []
+}
+
 export default async function TravelDetailPage({ params }: PageProps) {
   const { id } = await params
   const [travel, members, waypoints] = await Promise.all([
@@ -84,6 +96,7 @@ export default async function TravelDetailPage({ params }: PageProps) {
   const { data: { user } } = await createClient().auth.getUser()
   const isHost = user != null && travel.host_id === user.id
   const isMember = user != null && members.some((m) => m.user_id === user.id)
+  const pendingRequests = await getPendingRequests(id, isHost)
 
   return (
     <TravelDetailClient
@@ -93,6 +106,7 @@ export default async function TravelDetailPage({ params }: PageProps) {
       currentUserId={user?.id ?? null}
       isHost={isHost}
       isMember={isMember}
+      pendingRequests={pendingRequests}
     />
   )
 }

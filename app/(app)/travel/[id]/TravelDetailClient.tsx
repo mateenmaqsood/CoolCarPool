@@ -42,6 +42,17 @@ interface TravelDetailClientProps {
   currentUserId: string | null
   isHost: boolean
   isMember: boolean
+  pendingRequests: Array<{
+    id: string
+    travel_id: string
+    requester_id: string
+    waypoint_id: string | null
+    km_from_origin: number
+    message: string | null
+    status: string
+    created_at: string
+    requester?: { id: string; full_name: string; avatar_url: string | null; gender: string; city: string | null } | null
+  }>
 }
 
 const TABS = ['Route', 'Seats', 'Chat'] as const
@@ -54,6 +65,7 @@ export function TravelDetailClient({
   currentUserId,
   isHost,
   isMember,
+  pendingRequests,
 }: TravelDetailClientProps) {
   const router = useRouter()
   const { toast } = useToast()
@@ -72,8 +84,7 @@ export function TravelDetailClient({
   const isCurrentUserHost = isHost
   const host = travel.host ?? { id: travel.host_id, full_name: 'Host', avatar_url: null, gender: 'male' as const }
 
-  // Host: fetch pending requests
-  const pendingRequests = members.filter((m) => !m.is_host && !m.is_full_route && m.km_from_origin > 0 && m.id.startsWith('REQ_'))
+  // Host: use passed pending requests (from travel_requests table)
 
   const handleRequestJoin = async (waypointId: string | null, message: string) => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -405,12 +416,12 @@ export function TravelDetailClient({
                       >
                         <div className="flex items-center gap-3">
                           <Avatar
-                            name={req.profile?.full_name ?? 'Passenger'}
-                            src={req.profile?.avatar_url}
+                            name={req.requester?.full_name ?? 'Passenger'}
+                            src={req.requester?.avatar_url}
                             size="sm"
                           />
                           <div>
-                            <p className="font-medium text-ink">{req.profile?.full_name ?? 'Passenger'}</p>
+                            <p className="font-medium text-ink">{req.requester?.full_name ?? 'Passenger'}</p>
                             <p className="text-xs text-ink-secondary">
                               {req.km_from_origin > 0
                                 ? `Mid-route: ${waypoints.find((w) => w.km_from_origin === req.km_from_origin)?.label ?? `${req.km_from_origin} km`}`
