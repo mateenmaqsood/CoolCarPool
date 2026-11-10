@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   CoolCarPool — Apple-inspired semantic design tokens
+   Light theme values are the defaults; [data-theme="dark"] overrides below.
+   ========================================================================== */
+
+:root {
+  --bg-canvas: #ffffff;
+  --bg-elevated: #f5f5f7;
+  --bg-sunken: #ebedf0;
+
+  --fg-primary: #1d1d1f;
+  --fg-secondary: #6e6e73;
+  --fg-tertiary: #aeaeb2;
+
+  --border: #d2d2d7;
+  --border-focus: #007aff;
+
+  --brand: #007aff;
+  --brand-hover: #0071e3;
+  --brand-soft: rgba(0, 122, 255, 0.1);
+
+  --ok: #34c759;
+  --warn: #ff9f0a;
+  --error: #ff3b30;
+
+  --accent-from: #ff9f0a;
+  --accent-to: #ff453a;
+
+  --overlay: rgba(0, 0, 0, 0.4);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 100px;
+}
+
+[data-theme='dark'] {
+  --bg-canvas: #000000;
+  --bg-elevated: #1c1c1e;
+  --bg-sunken: #0b0b0d;
+
+  --fg-primary: #f5f5f7;
+  --fg-secondary: #98989d;
+  --fg-tertiary: #636366;
+
+  --border: #3a3a3c;
+  --border-focus: #409cff;
+
+  --brand: #0a84ff;
+  --brand-hover: #409cff;
+  --brand-soft: rgba(10, 132, 255, 0.16);
+
+  --ok: #30d158;
+  --warn: #ff9f0a;
+  --error: #ff453a;
+
+  --overlay: rgba(0, 0, 0, 0.65);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.65);
+}
+
+html {
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+body {
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--brand-soft);
+}
+
+/* Slim, themed scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 100px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Hide native date/time picker marks so inputs stay minimal */
+input[type='date']::-webkit-calendar-picker-indicator,
+input[type='time']::-webkit-calendar-picker-indicator {
+  opacity: 0.55;
+  cursor: pointer;
+}
+[data-theme='dark'] input[type='date']::-webkit-calendar-picker-indicator,
+[data-theme='dark'] input[type='time']::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+@layer components {
+  /* Gradient accent used for score bars and hero CTAs (matches reference UI) */
+  .accent-gradient {
+    background-image: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+  }
+  .accent-text-gradient {
+    background-image: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
