@@ -143,6 +143,12 @@ input[type='time']::-webkit-calendar-picker-indicator {
   background: var(--bg-elevated);
   font-family: inherit;
 }
+/* Pulsing halo behind the glowing origin pin */
+@keyframes ccp-pin-pulse {
+  0% { transform: scale(0.6); opacity: 0.55; }
+  70% { transform: scale(1.35); opacity: 0; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
 [data-theme='dark'] .leaflet-tile {
   filter: brightness(0.66) contrast(1.06) saturate(0.75);
 }

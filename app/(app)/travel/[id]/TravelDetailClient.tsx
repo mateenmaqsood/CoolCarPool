@@ -29,7 +29,14 @@ import { useToast } from '@/components/ui/Toast'
 
 const LeafletRouteMap = dynamic(
   () => import('@/components/route/LeafletRouteMap').then(m => ({ default: m.LeafletRouteMap })),
-  { loading: () => <div className="h-96 animate-pulse rounded-3xl bg-elevated" style={{ height: 384, minHeight: 320, width: '100%' }} />, ssr: false }
+  {
+    loading: () => (
+      <div className="relative" style={{ height: 384, minHeight: 320, width: '100%' }} aria-busy="true">
+        <div className="h-full w-full animate-pulse rounded-3xl bg-elevated" />
+      </div>
+    ),
+    ssr: false,
+  }
 )
 import { createClient } from '@/lib/supabase/client'
 import type { Travel, TravelMember, Waypoint, Profile } from '@/types'

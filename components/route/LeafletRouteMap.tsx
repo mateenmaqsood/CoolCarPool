@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { SVGRouteMap } from './SVGRouteMap'
 // Leaflet's stylesheet is required — without it the panes/tiles render
 // unpositioned and the map appears as a blank box.
@@ -177,22 +179,41 @@ export function LeafletRouteMap({
           routeDuration = routeDistance
         }
 
-        // Draw route polyline
+        // Draw route polyline — mockup look: soft glow casing + crisp green line
         if (routeCoords.length >= 2) {
+          // Glow casing (dark + soft green halo)
+          L.polyline(routeCoords, {
+            color: '#101408',
+            weight: 10,
+            opacity: 0.35,
+            lineCap: 'round',
+            lineJoin: 'round',
+          }).addTo(map)
+          L.polyline(routeCoords, {
+            color: '#9be96b',
+            weight: 4.5,
+            opacity: 0.35,
+            lineCap: 'round',
+            lineJoin: 'round',
+          }).addTo(map)
+          // Crisp main line
           L.polyline(routeCoords, {
             color: '#9be96b',
             weight: 4,
-            opacity: 0.9,
+            opacity: 0.95,
             lineCap: 'round',
             lineJoin: 'round',
           }).addTo(map)
         }
 
-        // Origin marker (green)
+        // Origin marker (glowing green pin — CSS pulse)
         L.marker([oLat, oLng], {
           icon: L.divIcon({
             className: 'custom-marker',
-            html: `<div style="width: 28px; height: 28px; border-radius: 50%; background: #9be96b; border: 3px solid #101408; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>`,
+            html: `<div style="position:relative;width:28px;height:28px;display:flex;align-items:center;justify-content:center;">
+              <span style="position:absolute;inset:-6px;border-radius:50%;background:rgba(155,233,107,0.45);animation:ccp-pin-pulse 1.8s ease-out infinite;"></span>
+              <span style="width:28px;height:28px;border-radius:50%;background:#9be96b;border:3px solid #101408;box-shadow:0 2px 8px rgba(0,0,0,0.3);position:relative;"></span>
+            </div>`,
             iconSize: [28, 28],
             iconAnchor: [14, 14],
           }),
@@ -290,10 +311,23 @@ export function LeafletRouteMap({
   if (loading) {
     return (
       <div
-        className={cn('h-96 animate-pulse rounded-3xl bg-elevated', className)}
+        className={cn('relative', className)}
         style={{ height: 384, minHeight: 320, width: '100%' }}
         aria-label="Loading map..."
-      />
+        aria-busy="true"
+      >
+        <Skeleton className="h-full w-full rounded-3xl" />
+        {/* Centered pulsing pin while tiles + route load */}
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2">
+          <span className="relative flex h-12 w-12 items-center justify-center">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-25" />
+            <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-brand shadow-soft">
+              <MapPin className="h-5 w-5 text-brand-ink" />
+            </span>
+          </span>
+          <span className="text-xs font-medium text-ink-secondary">Finding the best route…</span>
+        </div>
+      </div>
     )
   }
 
