@@ -69,33 +69,38 @@ export default function SignupPage() {
       return
     }
 
-    // Ensure the profile row exists. The on_auth_user_created trigger normally
-    // creates it from raw_user_meta_data; this upsert is an idempotent
-    // fallback (and tops up city/phone) that won't 23505 on conflict.
-    const { error: profileError } = await supabase.from('profiles').upsert(
-      {
-        id: data.user.id,
-        full_name: values.fullName,
-        gender: values.gender,
-        city: values.city || null,
-        phone: values.phone || null,
-        email_verified: false,
-        phone_verified: false,
-      },
-      { onConflict: 'id' }
-    )
+    // The on_auth_user_created trigger already created the profile from
+    // raw_user_meta_data. Only top it up when we actually have a session —
+    // with email confirmation ON, data.user exists but data.session is null,
+    // and an RLS write would fail. (BUG 2)
+    if (data.session && data.user) {
+      const { error: profileError } = await supabase.from('profiles').upsert(
+        {
+          id: data.user.id,
+          full_name: values.fullName,
+          gender: values.gender,
+          city: values.city || null,
+          phone: values.phone || null,
+          email_verified: false,
+          phone_verified: false,
+        },
+        { onConflict: 'id' }
+      )
 
-    if (profileError) {
-      // Session exists but profile row failed — surface it, still let them in.
-      console.error('[signup] profile insert failed:', profileError.message)
-      toast({
-        title: 'Account created — finishing profile',
-        description: 'We could not fully create your profile. Open Profile to complete it.',
-        variant: 'warning',
-        durationMs: 6000,
-      })
+      if (profileError) {
+        // Session exists but profile row failed — surface it, still let them in.
+        console.error('[signup] profile upsert failed:', profileError.message)
+        toast({
+          title: 'Account created — finishing profile',
+          description: 'We could not fully create your profile. Open Profile to complete it.',
+          variant: 'warning',
+          durationMs: 6000,
+        })
+      } else {
+        toast({ title: 'Account created 🎉', description: 'Your ride circle is ready.', variant: 'success' })
+      }
     } else {
-      toast({ title: 'Account created 🎉', description: 'Your ride circle is ready.', variant: 'success' })
+      toast({ title: 'Account created 🎉', description: 'Confirm your email to finish setup.', variant: 'success' })
     }
 
     // Offer biometric login enablement

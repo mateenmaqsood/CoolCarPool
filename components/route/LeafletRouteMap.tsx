@@ -34,6 +34,46 @@ export interface LeafletRouteMapProps {
 }
 
 /**
+ * Well-known Pakistani city coordinates — used as the FIRST coordinate source
+ * (keyless, instant) before falling back to Nominatim geocoding. Guarantees a
+ * real distance via Haversine even when geocoding/OSRM are unreachable.
+ */
+const CITY_COORDS: Record<string, [number, number]> = {
+  'Lahore': [31.5204, 74.3587], 'Islamabad': [33.6844, 73.0479],
+  'Rawalpindi': [33.6007, 73.0679], 'Murree': [33.9062, 73.3903],
+  'Karachi': [24.8607, 67.0011], 'Peshawar': [34.0151, 71.5249],
+  'Multan': [30.1575, 71.5249], 'Faisalabad': [31.4504, 73.1350],
+  'Sialkot': [32.4945, 74.5229], 'Nathia Gali': [33.9833, 73.3833],
+  'Abbottabad': [34.1463, 73.2117], 'Naran': [34.9008, 73.6511],
+  'Kaghan': [34.7667, 73.5833], 'Hunza': [36.3167, 74.6500],
+}
+
+function cityCoords(text: string): { lat: number; lng: number } | null {
+  const t = text.trim().toLowerCase()
+  if (!t) return null
+  // Exact match first, then a "contains" match (e.g. "Lahore, Punjab")
+  for (const [name, coords] of Object.entries(CITY_COORDS)) {
+    if (t === name.toLowerCase()) return { lat: coords[0], lng: coords[1] }
+  }
+  for (const [name, coords] of Object.entries(CITY_COORDS)) {
+    if (t.includes(name.toLowerCase())) return { lat: coords[0], lng: coords[1] }
+  }
+  return null
+}
+
+function haversineKm(a: [number, number], b: [number, number]): number {
+  const R = 6371
+  const dLat = ((b[0] - a[0]) * Math.PI) / 180
+  const dLon = ((b[1] - a[1]) * Math.PI) / 180
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((a[0] * Math.PI) / 180) *
+      Math.cos((b[0] * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x))
+}
+
+/**
  * Leaflet Route Map — uses OpenStreetMap tiles + OSRM for real road routing.
  * Falls back to straight-line if geocoding/routing fails.
  */
@@ -102,12 +142,6 @@ export function LeafletRouteMap({
           attribution: '&copy; OpenStreetMap contributors',
         }).addTo(map)
 
-        // Geocode origin and destination if lat/lng not provided
-        let oLat = originLat
-        let oLng = originLng
-        let dLat = destinationLat
-        let dLng = destinationLng
-
         const geocode = async (text: string): Promise<{ lat: number; lng: number } | null> => {
           try {
             const response = await fetch(
@@ -124,12 +158,22 @@ export function LeafletRouteMap({
           return null
         }
 
+        // Geocode origin and destination if lat/lng not provided.
+        // Order: saved coords → CITY_COORDS (instant) → Nominatim.
+        let oLat = originLat
+        let oLng = originLng
+        let dLat = destinationLat
+        let dLng = destinationLng
+
+        const oCity = cityCoords(origin)
+        const dCity = cityCoords(destination)
+
         if (oLat == null || oLng == null) {
-          const geo = await geocode(origin)
+          const geo = oCity ?? (await geocode(origin))
           if (geo) { oLat = geo.lat; oLng = geo.lng }
         }
         if (dLat == null || dLng == null) {
-          const geo = await geocode(destination)
+          const geo = dCity ?? (await geocode(destination))
           if (geo) { dLat = geo.lat; dLng = geo.lng }
         }
 
@@ -139,10 +183,11 @@ export function LeafletRouteMap({
           throw new Error('Could not geocode origin/destination')
         }
 
-        // Fetch route from OSRM
+        // Seed the distance immediately from Haversine (BUG 9: never 0 km),
+        // then let the OSRM road distance refine it below.
         let routeCoords: [number, number][] = []
-        let routeDistance = 0
-        let routeDuration = 0
+        let routeDistance = haversineKm([oLat, oLng], [dLat, dLng])
+        let routeDuration = routeDistance
 
         try {
           const coordStr = `${oLng},${oLat};${dLng},${dLat}`
@@ -267,7 +312,7 @@ export function LeafletRouteMap({
             }).addTo(map)
           }
 
-          marker.bindPopup(`<strong>${wp.label}</strong><br>${wp.km_from_origin} km from origin`)
+          marker.bindPopup(`<strong>${wp.label}</strong>${wp.km_from_origin > 0 ? `<br><span>${wp.km_from_origin} km</span>` : ''}`)
         }
 
         // Fit bounds to show entire route

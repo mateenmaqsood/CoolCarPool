@@ -41,7 +41,6 @@ import {
   hostFormSchema,
   type HostFormValues,
 } from '@/lib/validations'
-import type { Profile } from '@/types'
 import { cn, formatPKR, combineDateAndTime } from '@/lib/utils'
 
 /* -------------------------------------------------------------------- */
@@ -161,6 +160,10 @@ const DEFAULTS: HostFormValues = {
   pickup_radius_km: 2,
   estimated_cost_pkr: undefined as unknown as number,
   description: '',
+  vehicle_make: '',
+  vehicle_model: '',
+  vehicle_color: '',
+  vehicle_plate: '',
 }
 
 export function TravelForm() {
@@ -169,7 +172,6 @@ export function TravelForm() {
   const supabase = useMemo(() => createClient(), [])
 
   const [step, setStep] = useState(0)
-  const [profile, setProfile] = useState<Profile | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [dupMatches, setDupMatches] = useState<DuplicateMatchView[] | null>(null)
   const [dupOpen, setDupOpen] = useState(false)
@@ -198,7 +200,18 @@ export function TravelForm() {
         .select('*')
         .eq('id', user.id)
         .single()
-      if (!cancelled) setProfile((data as Profile) ?? null)
+      if (!cancelled) {
+        // Prefill vehicle fields for the review step (BUG 5)
+        if (data) {
+          form.reset({
+            ...form.getValues(),
+            vehicle_make: (data.vehicle_make as string) ?? '',
+            vehicle_model: (data.vehicle_model as string) ?? '',
+            vehicle_color: (data.vehicle_color as string) ?? '',
+            vehicle_plate: (data.vehicle_plate as string) ?? '',
+          })
+        }
+      }
     })()
     return () => {
       cancelled = true
@@ -300,6 +313,19 @@ export function TravelForm() {
         is_full_route: true,
         km_from_origin: 0,
       })
+
+      // BUG 5: vehicle details are captured in the host form now —
+      // persist them to the host profile so riders see them.
+      const { error: vehicleError } = await supabase.from('profiles').update({
+        vehicle_make: v.vehicle_make?.trim() || null,
+        vehicle_model: v.vehicle_model?.trim() || null,
+        vehicle_color: v.vehicle_color?.trim() || null,
+        vehicle_plate: v.vehicle_plate?.trim().toUpperCase() || null,
+      }).eq('id', user.id)
+      if (vehicleError) {
+        // Never block the post on this.
+        console.warn('[host] vehicle update failed:', vehicleError.message)
+      }
 
       return data.id
     } finally {
@@ -708,16 +734,43 @@ export function TravelForm() {
                 />
               </dl>
 
-              {/* Vehicle info (read-only from profile) */}
-              <div className="flex items-start gap-3 rounded-3xl bg-elevated p-4">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft">
-                  <Car className="h-4 w-4 text-brand" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-ink">Your vehicle</p>
-                  <p className="text-xs text-ink-secondary">
-                    {vehicleSummary(profile) ?? 'Add vehicle details in your profile for rider trust.'}
-                  </p>
+              {/* Vehicle details — editable here (moved from Profile Edit) */}
+              <div className="flex flex-col gap-3 rounded-3xl bg-elevated p-4">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft">
+                    <Car className="h-4 w-4 text-brand" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-ink">Your vehicle</p>
+                    <p className="text-xs text-ink-secondary">Visible to riders for trust & safety</p>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Input
+                    label="Make"
+                    placeholder="Toyota"
+                    {...register('vehicle_make')}
+                    error={errors.vehicle_make?.message?.toString()}
+                  />
+                  <Input
+                    label="Model"
+                    placeholder="Corolla"
+                    {...register('vehicle_model')}
+                    error={errors.vehicle_model?.message?.toString()}
+                  />
+                  <Input
+                    label="Color"
+                    placeholder="White"
+                    {...register('vehicle_color')}
+                    error={errors.vehicle_color?.message?.toString()}
+                  />
+                  <Input
+                    label="Plate number"
+                    placeholder="LHR-1234"
+                    className="uppercase"
+                    {...register('vehicle_plate')}
+                    error={errors.vehicle_plate?.message?.toString()}
+                  />
                 </div>
               </div>
 
@@ -788,14 +841,6 @@ function ReviewRow({ label, value, onEdit }: { label: string; value: string; onE
       </dd>
     </div>
   )
-}
-
-function vehicleSummary(profile: Profile | null): string | null {
-  if (!profile) return null
-  const parts = [profile.vehicle_make, profile.vehicle_model, profile.vehicle_color].filter(Boolean)
-  if (parts.length === 0) return null
-  const plate = profile.vehicle_plate ? ` · ${profile.vehicle_plate}` : ''
-  return `${parts.join(' ')}${plate}`
 }
 
 function formatDepartureSafe(iso: string): string {

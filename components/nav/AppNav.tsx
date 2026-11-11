@@ -204,8 +204,15 @@ function UserMenu({ name, avatarUrl, className }: { name: string; avatarUrl: str
 /** Floating charcoal pill tab bar for mobile — the mockup's bottom nav. */
 function TabBar() {
   const pathname = usePathname()
+  const router = useRouter()
   const supabase = createClient()
   const [unreadCount, setUnreadCount] = useState(0)
+
+  async function signOut() {
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -263,6 +270,16 @@ function TabBar() {
             </span>
           )}
         </Link>
+        {/* BUG 12: sign out must be reachable on mobile too */}
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          aria-label="Log out"
+          className="flex w-[4.5rem] flex-col items-center gap-0.5 rounded-pill py-2 text-ink-tertiary transition-colors duration-150 hover:text-white"
+        >
+          <LogOut className="h-5 w-5" />
+          <span className="text-[9px] font-semibold tracking-wide">Log out</span>
+        </button>
       </div>
     </nav>
   )

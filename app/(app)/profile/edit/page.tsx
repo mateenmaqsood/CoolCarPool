@@ -27,10 +27,6 @@ const profileEditSchema = z.object({
   phone: z.string().max(20).regex(/^\+?[0-9\s-]{7,20}$/, 'Use digits, spaces or dashes').optional().or(z.literal('')),
   city: z.string().max(60).optional().or(z.literal('')),
   gender: z.enum(['male', 'female']),
-  vehicle_make: z.string().max(60).optional().or(z.literal('')),
-  vehicle_model: z.string().max(60).optional().or(z.literal('')),
-  vehicle_color: z.string().max(60).optional().or(z.literal('')),
-  vehicle_plate: z.string().max(20).optional().or(z.literal('')),
 })
 
 type ProfileEditData = z.infer<typeof profileEditSchema>
@@ -50,10 +46,6 @@ export default function ProfileEditPage() {
       phone: '',
       city: '',
       gender: 'male',
-      vehicle_make: '',
-      vehicle_model: '',
-      vehicle_color: '',
-      vehicle_plate: '',
     },
     mode: 'onTouched',
   })
@@ -76,10 +68,6 @@ export default function ProfileEditPage() {
           phone: data.phone ?? '',
           city: data.city ?? '',
           gender: data.gender ?? 'male',
-          vehicle_make: data.vehicle_make ?? '',
-          vehicle_model: data.vehicle_model ?? '',
-          vehicle_color: data.vehicle_color ?? '',
-          vehicle_plate: data.vehicle_plate ?? '',
         })
         setAvatarUrl(data.avatar_url ?? null)
       }
@@ -106,7 +94,10 @@ export default function ProfileEditPage() {
 
     setUploadingAvatar(true)
     try {
-      const path = `${user.id}/avatar.jpg`
+      // BUG 10: path must be `${user.id}/avatar.${ext}` so the RLS policy
+      // (first folder segment = auth.uid) matches, and re-uploads overwrite.
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const path = `${user.id}/avatar.${ext}`
       const { error } = await supabase.storage.from('avatars').upload(path, file, {
         upsert: true,
         contentType: file.type,
@@ -144,10 +135,6 @@ export default function ProfileEditPage() {
         phone: values.phone || null,
         city: values.city || null,
         gender: values.gender,
-        vehicle_make: values.vehicle_make || null,
-        vehicle_model: values.vehicle_model || null,
-        vehicle_color: values.vehicle_color || null,
-        vehicle_plate: values.vehicle_plate?.toUpperCase() || null,
       }
 
       const { error } = await supabase.from('profiles').update(updates).eq('id', user.id)
@@ -259,41 +246,7 @@ export default function ProfileEditPage() {
           </div>
         </div>
 
-        {/* Vehicle Section */}
-        <div id="vehicle" className="rounded-3xl bg-elevated p-6 space-y-4 border border-line">
-          <h2 className="text-lg font-semibold text-ink flex items-center gap-2">
-            <Car className="h-5 w-5 text-brand" />
-            Vehicle Details
-          </h2>
-          <p className="text-sm text-ink-secondary">Visible to riders for trust & safety</p>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label="Make"
-              placeholder="Toyota"
-              {...register('vehicle_make')}
-              error={errors.vehicle_make?.message?.toString()}
-            />
-            <Input
-              label="Model"
-              placeholder="Corolla"
-              {...register('vehicle_model')}
-              error={errors.vehicle_model?.message?.toString()}
-            />
-            <Input
-              label="Color"
-              placeholder="White"
-              {...register('vehicle_color')}
-              error={errors.vehicle_color?.message?.toString()}
-            />
-            <Input
-              label="Plate"
-              placeholder="LHR-1234"
-              {...register('vehicle_plate')}
-              error={errors.vehicle_plate?.message?.toString()}
-            />
-          </div>
-        </div>
+        {/* Vehicle details now live in the Host form (Step 4 — Review) */}
 
         {/* Save Button */}
         <Button type="submit" variant="primary" loading={saving} className="h-11 w-full mt-4">

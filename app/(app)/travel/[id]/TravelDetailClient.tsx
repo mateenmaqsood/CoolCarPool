@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -85,7 +85,30 @@ export function TravelDetailClient({
   const [showLockConfirm, setShowLockConfirm] = useState(false)
   const [locking, setLocking] = useState(false)
 
-  const isFull = travel.available_seats <= 0
+  // BUG 11: seats must react to members joining in realtime, not just page load.
+  const [availableSeats, setAvailableSeats] = useState(travel.available_seats)
+  useEffect(() => setAvailableSeats(travel.available_seats), [travel.available_seats])
+
+  useEffect(() => {
+    if (!travel.id) return
+    const channel = supabase
+      .channel(`travel-members-${travel.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'travel_members', filter: `travel_id=eq.${travel.id}` },
+        () => {
+          // Optimistic decrement, then authoritative refetch from the DB.
+          setAvailableSeats((s) => Math.max(0, s - 1))
+          router.refresh()
+        },
+      )
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [supabase, travel.id, router])
+
+  const isFull = availableSeats <= 0
   const isLocked = travel.status !== 'open'
   const canJoin = !isFull && !isLocked && currentUserId && !isMember && !isHost
   const isCurrentUserHost = isHost
@@ -98,6 +121,21 @@ export function TravelDetailClient({
     if (!user) { toast({ title: 'Please log in first', variant: 'error' }); return }
 
     try {
+      // BUG 3: travel_requests.requester_id has an FK to profiles. If the
+      // profile row is missing (legacy users), the insert 23503s. Ensure the
+      // row exists first — ignoreDuplicates keeps this a no-op normally.
+      const { error: profileUpsertError } = await supabase.from('profiles').upsert(
+        {
+          id: user.id,
+          full_name: user.user_metadata?.full_name ?? 'User',
+          gender: (user.user_metadata?.gender as 'male' | 'female' | undefined) ?? 'male',
+        },
+        { onConflict: 'id', ignoreDuplicates: true }
+      )
+      if (profileUpsertError) {
+        console.warn('[join] profile upsert failed:', profileUpsertError.message)
+      }
+
       const selectedWp = waypointId ? waypoints.find(w => w.id === waypointId) : null
       const { error } = await supabase.from('travel_requests').insert({
         travel_id: travel.id,
@@ -256,7 +294,7 @@ export function TravelDetailClient({
           size="sm"
           icon={isLocked ? <Lock className="h-3 w-3" /> : <Users className="h-3 w-3" />}
         >
-          {isLocked ? travel.status : `${travel.available_seats} Seats Left`}
+          {isLocked ? travel.status : `${availableSeats} Seats Left`}
         </Badge>
       </div>
 

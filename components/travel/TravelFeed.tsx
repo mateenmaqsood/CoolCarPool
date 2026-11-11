@@ -4,7 +4,6 @@ import { useMemo, useState, useEffect } from 'react'
 import { SearchX, Search } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { Badge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
 import { TravelCard } from '@/components/travel/TravelCard'
 import type { FeedTravel } from '@/lib/mock-data'
@@ -102,11 +101,6 @@ export function TravelFeed({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {fallback ? (
-            <Badge variant="warning" size="sm">
-              Demo data
-            </Badge>
-          ) : null}
           <Avatar name={userName || 'Traveler'} src={userAvatarUrl} size="lg" />
         </div>
       </div>

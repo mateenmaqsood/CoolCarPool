@@ -283,17 +283,21 @@ export function SVGRouteMap({
           <div key={wp.id} className="flex items-center gap-2 pl-6">
             <span className="w-2.5 h-2.5 rounded-full border-2 border-brand bg-elevated" />
             <span className="font-medium text-ink">{wp.label}</span>
-            <Badge variant="brand" size="sm" className="ml-1">
-              {wp.km_from_origin} km
-            </Badge>
+            {wp.km_from_origin > 0 ? (
+              <Badge variant="brand" size="sm" className="ml-1">
+                {wp.km_from_origin} km
+              </Badge>
+            ) : null}
           </div>
         ))}
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded-full bg-ok" />
           <span className="font-medium text-ink">{destination}</span>
-          <Badge variant="success" size="sm" className="ml-1">
-            {Math.round(totalKm)} km total
-          </Badge>
+          {Math.round(totalKm) > 0 ? (
+            <Badge variant="success" size="sm" className="ml-1">
+              {Math.round(totalKm)} km total
+            </Badge>
+          ) : null}
         </div>
       </div>
     </div>

@@ -239,9 +239,11 @@ CREATE POLICY "requests_update" ON travel_requests FOR UPDATE USING (
 );
 
 -- TRAVEL MEMBERS
+-- NOTE: never query travel_members inside its own policy (infinite recursion).
+-- Use the host relationship on travels instead.
 CREATE POLICY "members_select" ON travel_members FOR SELECT USING (
   user_id = auth.uid()
-  OR EXISTS (SELECT 1 FROM travel_members tm2 WHERE tm2.travel_id = travel_members.travel_id AND tm2.user_id = auth.uid())
+  OR EXISTS (SELECT 1 FROM travels WHERE id = travel_members.travel_id AND host_id = auth.uid())
 );
 CREATE POLICY "members_insert_host" ON travel_members FOR INSERT WITH CHECK (
   EXISTS (SELECT 1 FROM travels WHERE id = travel_id AND host_id = auth.uid())
@@ -340,3 +342,38 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ============================================================
+-- HOTFIX BATCH — run in Supabase SQL Editor (idempotent)
+-- 1. members_select: was self-referencing travel_members (infinite
+--    recursion crashing chat) → now joins via travels.host_id.
+-- 2. Backfill profiles for any auth user the trigger missed
+--    (fixes travel_requests FK violations "Could not send request").
+-- 3. Avatar UPDATE policy (re-upload over existing file).
+-- ============================================================
+
+-- 1. travel_members select without recursion
+DROP POLICY IF EXISTS "members_select" ON travel_members;
+CREATE POLICY "members_select" ON travel_members FOR SELECT USING (
+  user_id = auth.uid()
+  OR EXISTS (SELECT 1 FROM travels WHERE id = travel_members.travel_id AND host_id = auth.uid())
+);
+
+-- 2. Ensure every auth user has a profile row (backfill, safe to re-run)
+INSERT INTO public.profiles (id, full_name, gender)
+SELECT u.id,
+       COALESCE(u.raw_user_meta_data->>'full_name', 'User'),
+       COALESCE(u.raw_user_meta_data->>'gender', 'male')
+FROM auth.users u
+ON CONFLICT (id) DO NOTHING;
+
+-- 3. Storage — public read + own-folder upload AND update
+DROP POLICY IF EXISTS "avatars_public_read" ON storage.objects;
+CREATE POLICY "avatars_public_read" ON storage.objects FOR SELECT
+  USING (bucket_id = 'avatars');
+DROP POLICY IF EXISTS "avatars_user_upload" ON storage.objects;
+CREATE POLICY "avatars_user_upload" ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);
+DROP POLICY IF EXISTS "avatars_user_update" ON storage.objects;
+CREATE POLICY "avatars_user_update" ON storage.objects FOR UPDATE
+  USING (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);

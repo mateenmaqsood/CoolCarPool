@@ -59,7 +59,7 @@ export const HOST_STEP_FIELDS: string[][] = [
   ['origin', 'destination'],
   ['departure_date', 'departure_time', 'recurring_days'],
   ['total_seats', 'gender_preference', 'pickup_radius_km', 'estimated_cost_pkr'],
-  ['description'],
+  ['description', 'vehicle_make', 'vehicle_model', 'vehicle_color', 'vehicle_plate'],
 ]
 
 export const hostFormSchema = z
@@ -87,6 +87,10 @@ export const hostFormSchema = z
       .min(1, 'Enter an amount')
       .max(1_000_000, 'That looks unrealistic'),
     description: z.string().max(500, 'Keep it under 500 characters').optional().or(z.literal('')),
+    vehicle_make: z.string().max(60).optional().or(z.literal('')),
+    vehicle_model: z.string().max(60).optional().or(z.literal('')),
+    vehicle_color: z.string().max(60).optional().or(z.literal('')),
+    vehicle_plate: z.string().max(20).optional().or(z.literal('')),
   })
   .superRefine((values, ctx) => {
     // Origin ≠ destination
