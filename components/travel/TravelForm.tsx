@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -171,13 +171,16 @@ function AddressInput({
   const [results, setResults] = useState<GeoResult[]>([])
   const [open, setOpen] = useState(false)
   const [searching, setSearching] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
 
   // Keep the field in sync when the value is set from outside (city pills).
   useEffect(() => {
     setQuery(value)
   }, [value])
 
-  // Debounced Nominatim lookup (>= 3 chars, ~1 req/400ms — within courtesy).
+  // Debounced Nominatim lookup (>= 3 chars). Each new keystroke ABORTS the
+  // in-flight request so stale results can never overwrite fresh ones
+  // (this race was the "only shows Lahore" bug).
   useEffect(() => {
     if (query.trim() === value.trim()) return
     const t = setTimeout(async () => {
@@ -187,15 +190,24 @@ function AddressInput({
         setOpen(false)
         return
       }
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
       setSearching(true)
-      const r = await searchAddresses(q)
+      const r = await searchAddresses(q, 6, controller.signal)
+      if (controller.signal.aborted) return // a newer query took over
       setResults(r)
       setOpen(r.length > 0)
       setSearching(false)
-    }, 400)
+    }, 500)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
+
+  // Cancel any in-flight search when the field unmounts.
+  useEffect(() => {
+    return () => abortRef.current?.abort()
+  }, [])
 
   function pick(r: GeoResult) {
     setQuery(r.shortLabel)
@@ -267,10 +279,6 @@ function AddressInput({
 /* -------------------------------------------------------------------- */
 /* Main form                                                             */
 /* -------------------------------------------------------------------- */
-
-/* Stable empty array — a fresh [] literal each render would re-trigger the
-   route map's init effect on every keystroke. */
-const EMPTY_WAYPOINTS: never[] = []
 
 const DEFAULTS: HostFormValues = {
   origin: '',
@@ -347,6 +355,31 @@ export function TravelForm() {
       cancelled = true
     }
   }, [supabase])
+
+  /* Sub-portion rides: preview map waypoints built from the host's stops.
+     km via Haversine → A* highway graph (sync, no await). */
+  const stopWaypoints = useMemo(
+    () =>
+      stops.map((s, i) => {
+        const coords: [number, number] | null =
+          Number.isFinite(s.lat) && Number.isFinite(s.lng) ? [s.lat, s.lng] : null
+        let km = 0
+        if (coords && originCoords) km = haversineKm(originCoords, coords)
+        if (km <= 0) {
+          const sp = shortestRouteBetween(values.origin ?? '', s.label)
+          if (sp) km = sp.totalKm
+        }
+        return {
+          id: `stop-${i}`,
+          label: s.label,
+          km_from_origin: km,
+          sort_order: i,
+          lat: coords?.[0] ?? null,
+          lng: coords?.[1] ?? null,
+        }
+      }),
+    [stops, originCoords, values.origin],
+  )
 
   const departureIso = useMemo(
     () => combineDateAndTime(values.departure_date, values.departure_time),
@@ -736,6 +769,18 @@ export function TravelForm() {
           e.preventDefault()
           void submitTravel()
         }}
+        onKeyDown={(e) => {
+          // Enter must never silently POST the ride from a random input
+          // (the "review page auto-posts" bug). Instead:
+          //   steps 1–3  → Enter acts as "Next"
+          //   review step → Enter does nothing; only the Post button submits
+          if (e.key !== 'Enter') return
+          if (e.defaultPrevented) return // AddressInput handles Enter → pick
+          const el = e.target as HTMLElement
+          if (el.tagName === 'BUTTON' || el.closest('button')) return
+          e.preventDefault()
+          if (step < 3) goNext()
+        }}
         className="rounded-3xl bg-card p-6 shadow-soft"
       >
         {/* key={step} re-runs the entrance animation per step */}
@@ -861,7 +906,7 @@ export function TravelForm() {
                   <LeafletRouteMap
                     origin={values.origin.trim()}
                     destination={values.destination.trim()}
-                    waypoints={EMPTY_WAYPOINTS}
+                    waypoints={stopWaypoints}
                     totalKm={0}
                     originLat={originCoords?.[0] ?? null}
                     originLng={originCoords?.[1] ?? null}

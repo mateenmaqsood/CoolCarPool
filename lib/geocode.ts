@@ -23,16 +23,25 @@ const PK_VIEWBOX = '60.5,23.5,77.5,37.5'
 
 const HEADERS = { 'User-Agent': 'CoolCarPool/1.0 (hackathon ride-sharing app)' }
 
-/** Free-text address search → up to `limit` labelled results. */
-export async function searchAddresses(query: string, limit = 5): Promise<GeoResult[]> {
+/** Free-text address search → up to `limit` labelled results.
+ *  Cancellable via `signal` (superseded keystrokes abort the stale request)
+ *  and hard-timed-out at 6s so a hung request never stalls the dropdown. */
+export async function searchAddresses(query: string, limit = 5, signal?: AbortSignal): Promise<GeoResult[]> {
   const q = query.trim()
   if (q.length < 3) return []
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 6000)
+  if (signal) signal.addEventListener('abort', () => controller.abort(), { once: true })
 
   try {
     const url =
       `${NOMINATIM_BASE}/search?q=${encodeURIComponent(q)}` +
       `&format=json&addressdetails=1&limit=${limit}&viewbox=${PK_VIEWBOX}&bounded=0&countrycodes=pk`
-    const res = await fetch(url, { headers: HEADERS })
+    const res = await fetch(url, {
+      headers: { ...HEADERS, 'Accept-Language': 'en' },
+      signal: controller.signal,
+    })
     if (!res.ok) return []
     const data = (await res.json()) as Array<{
       display_name: string
@@ -51,8 +60,13 @@ export async function searchAddresses(query: string, limit = 5): Promise<GeoResu
       }
     })
   } catch (e) {
-    console.warn('[geocode] search failed:', e)
+    // Superseded keystroke (AbortError) — silent; real failures logged once.
+    if ((e as Error).name !== 'AbortError') {
+      console.warn('[geocode] search failed:', e)
+    }
     return []
+  } finally {
+    clearTimeout(timeout)
   }
 }
 

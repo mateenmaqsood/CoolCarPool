@@ -191,11 +191,18 @@ export function LeafletRouteMap({
         let routeDuration = routeDistance
         let usedStraightLine = false
 
+        // Multi-stop: ordered waypoints with coords become OSRM via-points so
+        // the route follows actual roads THROUGH the host's pickup points.
+        const sortedWps = [...waypoints].sort((a, b) => a.sort_order - b.sort_order)
+        const via = sortedWps
+          .filter((w) => w.lat != null && w.lng != null)
+          .map((w) => `${w.lng},${w.lat}`)
+        const coordStr = [`${oLng},${oLat}`, ...via, `${dLng},${dLat}`].join(';')
+
         const osrmServers = [
           'https://router.project-osrm.org',
           'https://routing.openstreetmap.de/routed-car',
         ]
-        const coordStr = `${oLng},${oLat};${dLng},${dLat}`
         for (const server of osrmServers) {
           try {
             const response = await fetch(
@@ -207,7 +214,7 @@ export function LeafletRouteMap({
               const route = data.routes[0]
               // OSRM returns [lng, lat] pairs
               routeCoords = route.geometry.coordinates.map((c: number[]) => [c[1], c[0]])
-              routeDistance = route.distance / 1000 // km
+              routeDistance = route.distance / 1000 // km — full multi-leg total
               routeDuration = route.duration / 60 // minutes
               break
             }
