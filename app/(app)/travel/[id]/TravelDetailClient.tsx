@@ -116,7 +116,7 @@ export function TravelDetailClient({
 
   // Host: use passed pending requests (from travel_requests table)
 
-  const handleRequestJoin = async (waypointId: string | null, message: string) => {
+  const handleRequestJoin = async (waypointId: string | null, message: string, seatsRequested = 1) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { toast({ title: 'Please log in first', variant: 'error' }); return }
 
@@ -137,6 +137,36 @@ export function TravelDetailClient({
       }
 
       const selectedWp = waypointId ? waypoints.find(w => w.id === waypointId) : null
+
+      // BUG 1: support multiple seats. If a pending request already exists,
+      // bump its seat count instead of blocking with "already requested".
+      const { data: pending } = await supabase
+        .from('travel_requests')
+        .select('id, seats_requested')
+        .eq('travel_id', travel.id)
+        .eq('requester_id', user.id)
+        .eq('status', 'pending')
+        .maybeSingle()
+
+      if (pending) {
+        const nextSeats = Math.min(4, (pending.seats_requested ?? 1) + seatsRequested)
+        const { error } = await supabase
+          .from('travel_requests')
+          .update({ seats_requested: nextSeats, message: message.trim() || null })
+          .eq('id', pending.id)
+        if (error) {
+          toast({ title: 'Could not update request', description: error.message, variant: 'error' })
+          return
+        }
+        toast({
+          title: `Request updated — ${nextSeats} seat${nextSeats > 1 ? 's' : ''} 🚗`,
+          description: 'Host will review shortly.',
+          variant: 'success',
+        })
+        router.refresh()
+        return
+      }
+
       const { error } = await supabase.from('travel_requests').insert({
         travel_id: travel.id,
         requester_id: user.id,
@@ -144,13 +174,10 @@ export function TravelDetailClient({
         km_from_origin: selectedWp?.km_from_origin ?? 0,
         message: message.trim() || null,
         status: 'pending',
+        seats_requested: seatsRequested,
       })
       if (error) {
-        if (error.code === '23505') {
-          toast({ title: 'You already requested this ride', variant: 'warning' })
-        } else {
-          toast({ title: 'Could not send request', description: error.message, variant: 'error' })
-        }
+        toast({ title: 'Could not send request', description: error.message, variant: 'error' })
         return
       }
       toast({ title: 'Request sent! 🚗', description: 'Host will review shortly.', variant: 'success' })
@@ -185,6 +212,7 @@ export function TravelDetailClient({
           is_host: false,
           is_full_route: req.waypoint_id === null,
           km_from_origin: req.km_from_origin,
+          seats_reserved: req.seats_requested ?? 1,
         })
       }
 
@@ -237,6 +265,25 @@ export function TravelDetailClient({
     } finally {
       setLocking(false)
       setShowLockConfirm(false)
+    }
+  }
+
+  const handleUnlockTravel = async () => {
+    setLocking(true)
+    try {
+      const { error } = await supabase
+        .from('travels')
+        .update({ status: 'open' })
+        .eq('id', travel.id)
+
+      if (error) throw error
+      toast({ title: 'Travel unlocked', description: 'Riders can now request to join again.', variant: 'success' })
+      router.refresh()
+    } catch (error) {
+      console.error('[unlock] error:', error)
+      toast({ title: 'Failed to unlock travel', variant: 'error' })
+    } finally {
+      setLocking(false)
     }
   }
 
@@ -503,7 +550,7 @@ export function TravelDetailClient({
               </Card>
             )}
 
-            {/* Lock Travel Button (Host only) */}
+            {/* Lock / Unlock Travel (Host only) */}
             {isCurrentUserHost && !isLocked && (
               <Button
                 variant="outline"
@@ -512,6 +559,18 @@ export function TravelDetailClient({
               >
                 <Lock className="h-4 w-4 mr-2" />
                 Lock Travel — no more join requests
+              </Button>
+            )}
+
+            {isCurrentUserHost && isLocked && (
+              <Button
+                variant="secondary"
+                onClick={handleUnlockTravel}
+                loading={locking}
+                className="w-full justify-start gap-2"
+              >
+                <Lock className="h-4 w-4 mr-2 opacity-50" />
+                Unlock Travel — reopen to join requests
               </Button>
             )}
           </div>

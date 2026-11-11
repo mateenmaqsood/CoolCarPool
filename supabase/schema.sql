@@ -86,8 +86,10 @@ CREATE TABLE travel_requests (
   status           TEXT NOT NULL DEFAULT 'pending'
                      CHECK (status IN ('pending','accepted','rejected','cancelled')),
   message          TEXT,
-  created_at       TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(travel_id, requester_id)
+  seats_requested  INT NOT NULL DEFAULT 1 CHECK (seats_requested >= 1 AND seats_requested <= 4),
+  created_at       TIMESTAMPTZ DEFAULT NOW()
+  -- NOTE: no UNIQUE(travel_id, requester_id) — users may request again after
+  -- a rejection and may reserve multiple seats (BUG 1).
 );
 
 -- ============================================================
@@ -100,6 +102,7 @@ CREATE TABLE travel_members (
   is_host          BOOLEAN DEFAULT FALSE,
   is_full_route    BOOLEAN DEFAULT TRUE,
   km_from_origin   FLOAT NOT NULL DEFAULT 0,
+  seats_reserved   INT NOT NULL DEFAULT 1 CHECK (seats_reserved >= 1 AND seats_reserved <= 4),
   joined_at        TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(travel_id, user_id)
 );
@@ -108,11 +111,11 @@ CREATE OR REPLACE FUNCTION sync_available_seats()
 RETURNS TRIGGER AS $$
 BEGIN
   UPDATE travels
-  SET available_seats = total_seats - (
-    SELECT COUNT(*) FROM travel_members
+  SET available_seats = total_seats - COALESCE((
+    SELECT SUM(seats_reserved) FROM travel_members
     WHERE travel_id = COALESCE(NEW.travel_id, OLD.travel_id)
       AND is_host = FALSE
-  )
+  ), 0)
   WHERE id = COALESCE(NEW.travel_id, OLD.travel_id);
   RETURN NEW;
 END;
@@ -377,3 +380,64 @@ CREATE POLICY "avatars_user_upload" ON storage.objects FOR INSERT
 DROP POLICY IF EXISTS "avatars_user_update" ON storage.objects;
 CREATE POLICY "avatars_user_update" ON storage.objects FOR UPDATE
   USING (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+-- ============================================================
+-- HOTFIX BATCH 2 — multi-seat booking + avatar bucket hardening
+-- Run in Supabase SQL Editor. Safe to re-run.
+-- ============================================================
+
+-- 1. travel_requests: allow re-request + multiple seats (BUG 1)
+ALTER TABLE travel_requests DROP CONSTRAINT IF EXISTS travel_requests_travel_id_requester_id_key;
+ALTER TABLE travel_requests ADD COLUMN IF NOT EXISTS seats_requested INT NOT NULL DEFAULT 1
+  CHECK (seats_requested >= 1 AND seats_requested <= 4);
+
+-- 2. travel_members: seats_reserved per row (multiple seats, one row per user)
+ALTER TABLE travel_members ADD COLUMN IF NOT EXISTS seats_reserved INT NOT NULL DEFAULT 1
+  CHECK (seats_reserved >= 1 AND seats_reserved <= 4);
+
+-- 3. Seat-sync trigger: count RESERVED SEATS, not member rows
+CREATE OR REPLACE FUNCTION public.sync_available_seats()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE public.travels
+  SET available_seats = total_seats - COALESCE((
+    SELECT SUM(seats_reserved) FROM public.travel_members
+    WHERE travel_id = COALESCE(NEW.travel_id, OLD.travel_id)
+      AND is_host = FALSE
+  ), 0)
+  WHERE id = COALESCE(NEW.travel_id, OLD.travel_id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_sync_seats ON travel_members;
+CREATE TRIGGER trg_sync_seats
+  AFTER INSERT OR DELETE ON travel_members
+  FOR EACH ROW EXECUTE FUNCTION public.sync_available_seats();
+
+-- Recount existing travels (one-time repair after adding seats_reserved)
+UPDATE public.travels t
+SET available_seats = t.total_seats - COALESCE((
+  SELECT SUM(seats_reserved) FROM public.travel_members m
+  WHERE m.travel_id = t.id AND m.is_host = FALSE
+), 0);
+
+-- 4. Avatars bucket (create if missing) + full policy set incl. delete
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('avatars', 'avatars', true, 5242880, ARRAY['image/jpeg','image/png','image/webp','image/gif'])
+ON CONFLICT (id) DO UPDATE SET public = true, file_size_limit = 5242880;
+
+DROP POLICY IF EXISTS "avatars_insert_own" ON storage.objects;
+CREATE POLICY "avatars_insert_own" ON storage.objects FOR INSERT WITH CHECK (
+  bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]
+);
+DROP POLICY IF EXISTS "avatars_update_own" ON storage.objects;
+CREATE POLICY "avatars_update_own" ON storage.objects FOR UPDATE USING (
+  bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]
+);
+DROP POLICY IF EXISTS "avatars_public_read" ON storage.objects;
+CREATE POLICY "avatars_public_read" ON storage.objects FOR SELECT USING (bucket_id = 'avatars');
+DROP POLICY IF EXISTS "avatars_delete_own" ON storage.objects;
+CREATE POLICY "avatars_delete_own" ON storage.objects FOR DELETE USING (
+  bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]
+);

@@ -120,6 +120,7 @@ export type TravelRequest = {
   km_from_origin: number
   status: TravelRequestStatus
   message: string | null
+  seats_requested?: number
   created_at: string
 }
 
@@ -130,6 +131,7 @@ export type TravelMember = {
   is_host: boolean
   is_full_route: boolean
   km_from_origin: number
+  seats_reserved?: number
   joined_at: string
 }
 

@@ -105,7 +105,8 @@ export default function ProfileEditPage() {
       if (error) throw error
 
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
-      setAvatarUrl(publicUrl)
+      // Cache-bust for immediate UI refresh; store the clean URL in the DB (BUG 5)
+      setAvatarUrl(`${publicUrl}?v=${Date.now()}`)
 
       // Update profile avatar_url
       await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id)

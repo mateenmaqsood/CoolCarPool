@@ -17,17 +17,17 @@ export interface FeedTravel extends Travel {
 
 export const MOCK_HOSTS = {
   ali: {
-    id: 'USER_A_ID',
+    id: '00000000-0000-0000-0000-000000000021',
     full_name: 'Ali Hassan',
     avatar_url: null,
   },
   sara: {
-    id: 'USER_B_ID',
+    id: '00000000-0000-0000-0000-000000000022',
     full_name: 'Sara Khan',
     avatar_url: null,
   },
   usman: {
-    id: 'USER_C_ID',
+    id: '00000000-0000-0000-0000-000000000023',
     full_name: 'Usman Tariq',
     avatar_url: null,
   },
@@ -47,7 +47,7 @@ function inDays(days: number, hour: number, minute = 0): string {
  */
 export const MOCK_TRAVELS: FeedTravel[] = [
   {
-    id: 'TRAVEL_A',
+    id: '00000000-0000-0000-0000-000000000001',
     host_id: MOCK_HOSTS.ali.id,
     origin_text: 'Lahore',
     origin_lat: 31.5204,
@@ -71,7 +71,7 @@ export const MOCK_TRAVELS: FeedTravel[] = [
     host: MOCK_HOSTS.ali,
   },
   {
-    id: 'TRAVEL_B',
+    id: '00000000-0000-0000-0000-000000000002',
     host_id: MOCK_HOSTS.usman.id,
     origin_text: 'Lahore',
     origin_lat: 31.5204,
@@ -95,7 +95,7 @@ export const MOCK_TRAVELS: FeedTravel[] = [
     host: MOCK_HOSTS.usman,
   },
   {
-    id: 'TRAVEL_C',
+    id: '00000000-0000-0000-0000-000000000003',
     host_id: MOCK_HOSTS.sara.id,
     origin_text: 'Islamabad',
     origin_lat: 33.6844,
@@ -119,7 +119,7 @@ export const MOCK_TRAVELS: FeedTravel[] = [
     host: MOCK_HOSTS.sara,
   },
   {
-    id: 'TRAVEL_D',
+    id: '00000000-0000-0000-0000-000000000004',
     host_id: MOCK_HOSTS.usman.id,
     origin_text: 'Lahore',
     origin_lat: 31.5204,
@@ -143,7 +143,7 @@ export const MOCK_TRAVELS: FeedTravel[] = [
     host: MOCK_HOSTS.usman,
   },
   {
-    id: 'TRAVEL_E',
+    id: '00000000-0000-0000-0000-000000000005',
     host_id: MOCK_HOSTS.ali.id,
     origin_text: 'Lahore',
     origin_lat: 31.5204,
@@ -173,7 +173,7 @@ export const MOCK_TRAVELS: FeedTravel[] = [
  */
 export const MOCK_PROFILES: Profile[] = [
   {
-    id: 'USER_A_ID',
+    id: '00000000-0000-0000-0000-000000000021',
     full_name: 'Ali Hassan',
     gender: 'male',
     phone: '+923001234567',
@@ -188,7 +188,7 @@ export const MOCK_PROFILES: Profile[] = [
     created_at: new Date('2026-01-15').toISOString(),
   },
   {
-    id: 'USER_B_ID',
+    id: '00000000-0000-0000-0000-000000000022',
     full_name: 'Sara Khan',
     gender: 'female',
     phone: '+923007654321',
@@ -203,7 +203,7 @@ export const MOCK_PROFILES: Profile[] = [
     created_at: new Date('2026-02-20').toISOString(),
   },
   {
-    id: 'USER_C_ID',
+    id: '00000000-0000-0000-0000-000000000023',
     full_name: 'Usman Tariq',
     gender: 'male',
     phone: '+923009876543',
@@ -224,9 +224,9 @@ export const MOCK_PROFILES: Profile[] = [
  * rider joining at Islamabad Toll Plaza (km 280). Total: 310 km, PKR 2500.
  */
 export const MOCK_BILL_SLIP: BillSlip = {
-  id: 'BILL_SLIP_MOCK_1',
-  travel_id: 'TRAVEL_A',
-  uploaded_by: 'USER_A_ID',
+  id: '00000000-0000-0000-0000-000000000031',
+  travel_id: '00000000-0000-0000-0000-000000000001',
+  uploaded_by: '00000000-0000-0000-0000-000000000021',
   storage_path: 'bill-slips/TRAVEL_A/mock-receipt.jpeg',
   total_pkr: 2500,
   total_km: 310,
@@ -236,15 +236,15 @@ export const MOCK_BILL_SLIP: BillSlip = {
     remaining_bill_pkr: 2258,
     full_route_fare_head_pkr: 1129,
     members: [
-      { userId: 'USER_A_ID', fullName: 'Ali Hassan', isHost: true, isFullRoute: true, kmCovered: 310, farePkr: 1129, sharePercentage: 45.2 },
-      { userId: 'USER_B_ID', fullName: 'Sara Khan', isHost: false, isFullRoute: false, kmCovered: 30, farePkr: 242, sharePercentage: 9.7 },
-      { userId: 'USER_C_ID', fullName: 'Usman Tariq', isHost: false, isFullRoute: true, kmCovered: 310, farePkr: 1129, sharePercentage: 45.2 },
+      { userId: '00000000-0000-0000-0000-000000000021', fullName: 'Ali Hassan', isHost: true, isFullRoute: true, kmCovered: 310, farePkr: 1129, sharePercentage: 45.2 },
+      { userId: '00000000-0000-0000-0000-000000000022', fullName: 'Sara Khan', isHost: false, isFullRoute: false, kmCovered: 30, farePkr: 242, sharePercentage: 9.7 },
+      { userId: '00000000-0000-0000-0000-000000000023', fullName: 'Usman Tariq', isHost: false, isFullRoute: true, kmCovered: 310, farePkr: 1129, sharePercentage: 45.2 },
     ],
     total_allocated_pkr: 2500,
     rounding_pkr: 0,
     ocr_source: 'manual',
   },
-  acknowledged_by: ['USER_A_ID'],
+  acknowledged_by: ['00000000-0000-0000-0000-000000000021'],
   created_at: new Date().toISOString(),
 }
 
@@ -294,14 +294,14 @@ export function getMockMembers(travelId: string): Array<TravelMember & { profile
   ]
 
   // Add mock members based on travel
-  if (travelId === 'TRAVEL_A') {
-    const sara = MOCK_PROFILES.find((p) => p.id === 'USER_B_ID')
-    const usman = MOCK_PROFILES.find((p) => p.id === 'USER_C_ID')
+  if (travelId === '00000000-0000-0000-0000-000000000001') {
+    const sara = MOCK_PROFILES.find((p) => p.id === '00000000-0000-0000-0000-000000000022')
+    const usman = MOCK_PROFILES.find((p) => p.id === '00000000-0000-0000-0000-000000000023')
     members.push(
       {
         id: `MEMBER_B_${travelId}`,
         travel_id: travelId,
-        user_id: 'USER_B_ID',
+        user_id: '00000000-0000-0000-0000-000000000022',
         is_host: false,
         is_full_route: false,
         km_from_origin: 280,
@@ -311,7 +311,7 @@ export function getMockMembers(travelId: string): Array<TravelMember & { profile
       {
         id: `MEMBER_C_${travelId}`,
         travel_id: travelId,
-        user_id: 'USER_C_ID',
+        user_id: '00000000-0000-0000-0000-000000000023',
         is_host: false,
         is_full_route: true,
         km_from_origin: 0,
@@ -319,9 +319,9 @@ export function getMockMembers(travelId: string): Array<TravelMember & { profile
         profile: usman ?? null,
       }
     )
-  } else if (travelId === 'TRAVEL_B') {
+  } else if (travelId === '00000000-0000-0000-0000-000000000002') {
     // No additional members yet
-  } else if (travelId === 'TRAVEL_C') {
+  } else if (travelId === '00000000-0000-0000-0000-000000000003') {
     // Could add members
   }
 
@@ -332,9 +332,9 @@ export function getMockMembers(travelId: string): Array<TravelMember & { profile
  * Get mock waypoints for a travel.
  */
 export function getMockWaypoints(travelId: string) {
-  if (travelId === 'TRAVEL_A') {
+  if (travelId === '00000000-0000-0000-0000-000000000001') {
     return [
-      { id: 'WP_1', travel_id: 'TRAVEL_A', label: 'Islamabad Toll Plaza', lat: 33.6844, lng: 73.0479, km_from_origin: 280, sort_order: 0, created_at: new Date().toISOString() },
+      { id: '00000000-0000-0000-0000-000000000011', travel_id: '00000000-0000-0000-0000-000000000001', label: 'Islamabad Toll Plaza', lat: 33.6844, lng: 73.0479, km_from_origin: 280, sort_order: 0, created_at: new Date().toISOString() },
     ]
   }
   return []
@@ -347,37 +347,37 @@ export function getMockMessages(travelId: string): Array<Message & { sender?: Pr
   const senderOf = (id: string): Profile | null =>
     MOCK_PROFILES.find((p) => p.id === id) ?? null
 
-  if (travelId === 'TRAVEL_A') {
+  if (travelId === '00000000-0000-0000-0000-000000000001') {
     return [
       {
-        id: 'MSG_1',
-        travel_id: 'TRAVEL_A',
+        id: '00000000-0000-0000-0000-000000000041',
+        travel_id: '00000000-0000-0000-0000-000000000001',
         sender_id: null,
         content: 'Ali Hassan created this travel',
         is_system: true,
         created_at: new Date(Date.now() - 3600000).toISOString(),
       },
       {
-        id: 'MSG_2',
-        travel_id: 'TRAVEL_A',
-        sender_id: 'USER_B_ID',
+        id: '00000000-0000-0000-0000-000000000042',
+        travel_id: '00000000-0000-0000-0000-000000000001',
+        sender_id: '00000000-0000-0000-0000-000000000022',
         content: 'Hi! Can I join from Islamabad?',
         is_system: false,
         created_at: new Date(Date.now() - 1800000).toISOString(),
-        sender: senderOf('USER_B_ID'),
+        sender: senderOf('00000000-0000-0000-0000-000000000022'),
       },
       {
-        id: 'MSG_3',
-        travel_id: 'TRAVEL_A',
-        sender_id: 'USER_A_ID',
+        id: '00000000-0000-0000-0000-000000000043',
+        travel_id: '00000000-0000-0000-0000-000000000001',
+        sender_id: '00000000-0000-0000-0000-000000000021',
         content: 'Sure! I added Islamabad Toll Plaza as a pickup point.',
         is_system: false,
         created_at: new Date(Date.now() - 1200000).toISOString(),
-        sender: senderOf('USER_A_ID'),
+        sender: senderOf('00000000-0000-0000-0000-000000000021'),
       },
       {
-        id: 'MSG_4',
-        travel_id: 'TRAVEL_A',
+        id: '00000000-0000-0000-0000-000000000044',
+        travel_id: '00000000-0000-0000-0000-000000000001',
         sender_id: null,
         content: 'Sara Khan joined the travel',
         is_system: true,

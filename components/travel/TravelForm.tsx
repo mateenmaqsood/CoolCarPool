@@ -279,6 +279,21 @@ export function TravelForm() {
         return null
       }
       const v = getValues()
+      // BUG 6: travels.host_id FK to profiles fails for legacy accounts whose
+      // profile row is missing (pre-trigger signups). Ensure it exists first.
+      const { error: profileUpsertError } = await supabase.from('profiles').upsert(
+        {
+          id: user.id,
+          full_name: user.user_metadata?.full_name ?? 'Host',
+          gender: (user.user_metadata?.gender as 'male' | 'female' | undefined) ?? 'male',
+          city: (user.user_metadata?.city as string | undefined) ?? null,
+          phone: (user.user_metadata?.phone as string | undefined) ?? null,
+        },
+        { onConflict: 'id', ignoreDuplicates: true }
+      )
+      if (profileUpsertError) {
+        console.warn('[host] profile upsert failed:', profileUpsertError.message)
+      }
       const { data, error } = await supabase.from('travels').insert({
         host_id: user.id,  // CRITICAL: fresh user.id, not profile?.id
         origin_text: v.origin.trim(),

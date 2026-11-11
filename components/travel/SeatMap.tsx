@@ -14,7 +14,7 @@ export interface SeatMapProps {
   waypoints: Waypoint[]
   currentUserId?: string | null
   isHost?: boolean
-  onRequestJoin?: (waypointId: string | null, message: string) => void
+  onRequestJoin?: (waypointId: string | null, message: string, seatsRequested?: number) => void
   className?: string
 }
 
@@ -23,6 +23,9 @@ interface SeatData {
   type: 'host' | 'occupied' | 'mid-route' | 'available'
   member?: TravelMember & { profile?: Profile | null }
   waypoint?: Waypoint | null
+  /** For multi-seat bookings: which seat of the rider's booking this is */
+  seatPart?: number
+  seatTotal?: number
 }
 
 /**
@@ -43,6 +46,7 @@ export function SeatMap({
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [joinWaypointId, setJoinWaypointId] = useState<string | null>(null)
   const [joinMessage, setJoinMessage] = useState('')
+  const [joinSeats, setJoinSeats] = useState(1)
 
   // Build seat data array
   const seats = useMemo(() => {
@@ -54,8 +58,17 @@ export function SeatMap({
       return new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime()
     })
 
+    // BUG 1: a rider may reserve multiple seats (seats_reserved) — expand each
+    // member into consecutive seat slots so the grid shows every reserved seat.
+    const occupants: Array<{ member: TravelMember & { profile?: Profile | null }; part: number; total: number }> = []
+    for (const m of sortedMembers) {
+      const total = Math.max(1, Math.min(4, m.seats_reserved ?? 1))
+      for (let k = 0; k < total; k++) occupants.push({ member: m, part: k, total })
+    }
+
     for (let i = 0; i < travel.total_seats; i++) {
-      const member = sortedMembers[i]
+      const occ = occupants[i]
+      const member = occ?.member
       const isCurrentUser = currentUserId && member?.user_id === currentUserId
 
       if (!member) {
@@ -64,9 +77,9 @@ export function SeatMap({
         seatData.push({ index: i, type: 'host', member })
       } else if (!member.is_full_route && member.km_from_origin > 0) {
         const waypoint = waypoints.find((w) => Math.abs(w.km_from_origin - member.km_from_origin) < 1)
-        seatData.push({ index: i, type: 'mid-route', member, waypoint: waypoint ?? null })
+        seatData.push({ index: i, type: 'mid-route', member, waypoint: waypoint ?? null, seatPart: occ.part, seatTotal: occ.total })
       } else {
-        seatData.push({ index: i, type: 'occupied', member })
+        seatData.push({ index: i, type: 'occupied', member, seatPart: occ.part, seatTotal: occ.total })
       }
     }
 
@@ -85,11 +98,12 @@ export function SeatMap({
   }
 
   const handleJoinSubmit = () => {
-    onRequestJoin?.(joinWaypointId, joinMessage)
+    onRequestJoin?.(joinWaypointId, joinMessage, joinSeats)
     setShowJoinModal(false)
     setSelectedSeat(null)
     setJoinWaypointId(null)
     setJoinMessage('')
+    setJoinSeats(1)
   }
 
   const handleJoinCancel = () => {
@@ -97,6 +111,7 @@ export function SeatMap({
     setSelectedSeat(null)
     setJoinWaypointId(null)
     setJoinMessage('')
+    setJoinSeats(1)
   }
 
   return (
@@ -139,6 +154,8 @@ export function SeatMap({
           onWaypointChange={setJoinWaypointId}
           message={joinMessage}
           onMessageChange={setJoinMessage}
+          seatsRequested={joinSeats}
+          onSeatsChange={setJoinSeats}
         />
       )}
     </div>
@@ -253,7 +270,13 @@ function SeatCard({ seat, travel, isSelected, onClick, disabled, isHost }: SeatC
 
           {member && !member.is_host && (
             <p className="text-[10px] mt-1 opacity-70">
-              {member.is_full_route ? 'Full route' : `From ${waypoint?.label ?? `${member.km_from_origin} km`}`}
+              {(seat.seatTotal ?? 1) > 1
+                ? seat.seatPart === 0
+                  ? `Booked ${seat.seatTotal} seats`
+                  : `Same rider ×${seat.seatTotal}`
+                : member.is_full_route
+                  ? 'Full route'
+                  : `From ${waypoint?.label ?? `${member.km_from_origin} km`}`}
             </p>
           )}
         </div>
@@ -284,6 +307,8 @@ interface JoinRequestModalProps {
   onWaypointChange: (id: string | null) => void
   message: string
   onMessageChange: (msg: string) => void
+  seatsRequested: number
+  onSeatsChange: (n: number) => void
 }
 
 function JoinRequestModal({
@@ -296,6 +321,8 @@ function JoinRequestModal({
   onWaypointChange,
   message,
   onMessageChange,
+  seatsRequested,
+  onSeatsChange,
 }: JoinRequestModalProps) {
   if (!open) return null
 
@@ -334,31 +361,75 @@ function JoinRequestModal({
                 <div className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-line transition-all peer-checked:border-brand peer-checked:bg-brand peer-checked:after:content-[''] peer-checked:after:block peer-checked:after:h-1.5 peer-checked:after:w-1.5 peer-checked:after:rounded-full peer-checked:after:bg-brand-ink" />
                 <div className="flex-1">
                   <p className="font-medium text-ink">Full route</p>
-                  <p className="text-xs text-ink-secondary">Origin to destination ({Math.round(travel.total_km)} km)</p>
+                  <p className="text-xs text-ink-secondary mt-0.5">
+                    📍 {travel.origin_text} → {travel.destination_text}
+                  </p>
+                  <p className="text-xs text-ink-tertiary mt-0.5">
+                    {Math.round(travel.total_km)} km · est. {(travel.estimated_cost_pkr ?? 0).toLocaleString('en-PK')} PKR total
+                  </p>
                 </div>
               </label>
 
-              {waypoints.map((wp) => (
-                <label key={wp.id} className="flex items-center gap-3 rounded-2xl bg-card p-3 cursor-pointer transition-colors hover:ring-2 hover:ring-brand-soft">
-                  <input
-                    type="radio"
-                    name="joinType"
-                    value={wp.id}
-                    checked={selectedWaypointId === wp.id}
-                    onChange={() => onWaypointChange(wp.id)}
-                    className="sr-only peer"
-                  />
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-line transition-all peer-checked:border-brand peer-checked:bg-brand peer-checked:after:content-[''] peer-checked:after:block peer-checked:after:h-1.5 peer-checked:after:w-1.5 peer-checked:after:rounded-full peer-checked:after:bg-brand-ink" />
-                  <div className="flex-1">
-                    <p className="font-medium text-ink">Mid-route: {wp.label}</p>
-                    <p className="text-xs text-ink-secondary">
-                      Join at {wp.km_from_origin} km · {Math.round(travel.total_km - wp.km_from_origin)} km ride
-                    </p>
-                  </div>
-                </label>
-              ))}
+              {waypoints.map((wp) => {
+                const rideKm = Math.max(0, Math.round(travel.total_km - wp.km_from_origin))
+                const estShare = travel.total_km > 0
+                  ? Math.round(((travel.total_km - wp.km_from_origin) / travel.total_km) * (travel.estimated_cost_pkr ?? 0))
+                  : 0
+                return (
+                  <label key={wp.id} className="flex items-center gap-3 rounded-2xl bg-card p-3 cursor-pointer transition-colors hover:ring-2 hover:ring-brand-soft">
+                    <input
+                      type="radio"
+                      name="joinType"
+                      value={wp.id}
+                      checked={selectedWaypointId === wp.id}
+                      onChange={() => onWaypointChange(wp.id)}
+                      className="sr-only peer"
+                    />
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-line transition-all peer-checked:border-brand peer-checked:bg-brand peer-checked:after:content-[''] peer-checked:after:block peer-checked:after:h-1.5 peer-checked:after:w-1.5 peer-checked:after:rounded-full peer-checked:after:bg-brand-ink" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-ink truncate">
+                        Mid-route: <span className="text-brand">{wp.label}</span>
+                      </p>
+                      {/* Full route context: origin → pickup → destination (BUG 2) */}
+                      <p className="text-xs text-ink-secondary mt-0.5 truncate">
+                        📍 {travel.origin_text} → <strong>{wp.label}</strong> → {travel.destination_text}
+                      </p>
+                      <p className="text-xs text-ink-tertiary mt-0.5">
+                        Join at km {Math.round(wp.km_from_origin)} · ride {rideKm} km · est. {estShare.toLocaleString('en-PK')} PKR
+                      </p>
+                    </div>
+                  </label>
+                )
+              })}
             </div>
           </fieldset>
+
+          {/* BUG 1: how many seats? */}
+          <div>
+            <label className="block text-sm font-medium text-ink mb-2">
+              How many seats? <span className="text-ink-tertiary text-xs">(max {Math.max(1, Math.min(4, travel.available_seats))})</span>
+            </label>
+            <div className="flex gap-2">
+              {[1, 2, 3, 4]
+                .filter((n) => n <= Math.max(1, Math.min(4, travel.available_seats)))
+                .map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    aria-pressed={seatsRequested === n}
+                    onClick={() => onSeatsChange(n)}
+                    className={cn(
+                      'h-10 w-10 rounded-xl text-sm font-semibold transition-colors',
+                      seatsRequested === n
+                        ? 'bg-brand text-brand-ink'
+                        : 'bg-card text-ink-secondary hover:text-ink'
+                    )}
+                  >
+                    {n}
+                  </button>
+                ))}
+            </div>
+          </div>
 
           <div>
             <label htmlFor="join-message" className="block text-sm font-medium text-ink mb-1">
