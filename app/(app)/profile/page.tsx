@@ -4,6 +4,7 @@ import { Car, Mail, MapPin, Phone, Shield, Users, CheckCircle2, Clock } from 'lu
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { ProfileSignOut } from '@/components/profile/ProfileSignOut'
 import { cn } from '@/lib/utils'
 
 export const revalidate = 60
@@ -170,8 +171,13 @@ export default async function ProfilePage() {
         )}
       </div>
 
+      {/* Sign out — lives here on mobile (bottom nav has 4 clean tabs) */}
+      <div className="mt-8">
+        <ProfileSignOut />
+      </div>
+
       {/* Footer Links */}
-      <div className="mt-8 flex flex-col items-center gap-3 text-xs text-ink-tertiary">
+      <div className="mt-4 flex flex-col items-center gap-3 text-xs text-ink-tertiary">
         <Link href="/legal/tos" className="hover:underline">Terms of Service</Link>
         <Link href="/legal/privacy" className="hover:underline">Privacy Policy</Link>
       </div>
