@@ -138,8 +138,11 @@ input[type='time']::-webkit-calendar-picker-indicator {
   filter: invert(1);
 }
 
-/* Leaflet map — keep the tile map legible on the charcoal canvas */
+/* Leaflet map — keep the tile map legible on the charcoal canvas.
+   z-index 0 + isolation on the wrapper keeps Leaflet's high internal pane
+   z-indexes (400+) trapped inside so they can never cover modals/nav. */
 .leaflet-container {
+  z-index: 0;
   background: var(--bg-elevated);
   font-family: inherit;
 }

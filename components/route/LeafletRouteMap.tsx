@@ -184,32 +184,42 @@ export function LeafletRouteMap({
           throw new Error('Could not geocode origin/destination')
         }
 
-        // Seed the distance immediately from Haversine (BUG 9: never 0 km),
-        // then let the OSRM road distance refine it below.
+        // Fetch the real road route from OSRM — primary demo server plus a
+        // free fallback; each gets one attempt (the demo server rate-limits).
         let routeCoords: [number, number][] = []
         let routeDistance = haversineKm([oLat, oLng], [dLat, dLng])
         let routeDuration = routeDistance
+        let usedStraightLine = false
 
-        try {
-          const coordStr = `${oLng},${oLat};${dLng},${dLat}`
-          const response = await fetch(
-            `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson&steps=false`,
-            { headers: { 'User-Agent': 'CoolCarPool/1.0' } }
-          )
-          const data = await response.json()
-          if (data.routes && data.routes.length > 0) {
-            const route = data.routes[0]
-            // OSRM returns [lng, lat] pairs
-            routeCoords = route.geometry.coordinates.map((c: number[]) => [c[1], c[0]])
-            routeDistance = route.distance / 1000 // km
-            routeDuration = route.duration / 60 // minutes
+        const osrmServers = [
+          'https://router.project-osrm.org',
+          'https://routing.openstreetmap.de/routed-car',
+        ]
+        const coordStr = `${oLng},${oLat};${dLng},${dLat}`
+        for (const server of osrmServers) {
+          try {
+            const response = await fetch(
+              `${server}/route/v1/driving/${coordStr}?overview=full&geometries=geojson&steps=false`,
+              { headers: { 'User-Agent': 'CoolCarPool/1.0' } }
+            )
+            const data = await response.json()
+            if (data.routes && data.routes.length > 0) {
+              const route = data.routes[0]
+              // OSRM returns [lng, lat] pairs
+              routeCoords = route.geometry.coordinates.map((c: number[]) => [c[1], c[0]])
+              routeDistance = route.distance / 1000 // km
+              routeDuration = route.duration / 60 // minutes
+              break
+            }
+          } catch (e) {
+            console.warn(`[LeafletRouteMap] OSRM (${server}) failed:`, e)
           }
-        } catch (e) {
-          console.warn('[LeafletRouteMap] OSRM failed, using straight line:', e)
         }
 
         // If OSRM failed, route over the Pakistan highway graph with A*
         // (shortest path through real cities — believable polyline + km).
+        // Skips intra-city pairs: both endpoints resolve to the same node,
+        // where a road graph between cities has nothing to offer.
         if (routeCoords.length === 0) {
           const shortest = shortestRouteBetween(origin, destination)
           if (shortest && shortest.path.length >= 2) {
@@ -224,9 +234,11 @@ export function LeafletRouteMap({
           }
         }
 
-        // Last resort: straight line between the endpoints
+        // Last resort: straight line between the endpoints. Drawn DASHED so it
+        // never pretends to be a road the vehicle would actually drive.
         if (routeCoords.length === 0) {
           routeCoords = [[oLat, oLng], [dLat, dLng]]
+          usedStraightLine = true
           // Approximate distance using haversine
           const R = 6371
           const dLatRad = ((dLat - oLat) * Math.PI) / 180
@@ -241,30 +253,34 @@ export function LeafletRouteMap({
           routeDuration = routeDistance
         }
 
-        // Draw route polyline — mockup look: soft glow casing + crisp green line
+        // Draw route polyline — mockup look: soft glow casing + crisp green line.
+        // A straight-line fallback renders dashed so it never fakes a road.
         if (routeCoords.length >= 2) {
-          // Glow casing (dark + soft green halo)
-          L.polyline(routeCoords, {
-            color: '#101408',
-            weight: 10,
-            opacity: 0.35,
-            lineCap: 'round',
-            lineJoin: 'round',
-          }).addTo(map)
-          L.polyline(routeCoords, {
-            color: '#9be96b',
-            weight: 4.5,
-            opacity: 0.35,
-            lineCap: 'round',
-            lineJoin: 'round',
-          }).addTo(map)
-          // Crisp main line
+          if (!usedStraightLine) {
+            // Glow casing (dark + soft green halo) — real roads only
+            L.polyline(routeCoords, {
+              color: '#101408',
+              weight: 10,
+              opacity: 0.35,
+              lineCap: 'round',
+              lineJoin: 'round',
+            }).addTo(map)
+            L.polyline(routeCoords, {
+              color: '#9be96b',
+              weight: 4.5,
+              opacity: 0.35,
+              lineCap: 'round',
+              lineJoin: 'round',
+            }).addTo(map)
+          }
+          // Crisp main line (dashed when it's only an approximation)
           L.polyline(routeCoords, {
             color: '#9be96b',
             weight: 4,
-            opacity: 0.95,
+            opacity: usedStraightLine ? 0.7 : 0.95,
             lineCap: 'round',
             lineJoin: 'round',
+            dashArray: usedStraightLine ? '8 10' : undefined,
           }).addTo(map)
         }
 
@@ -376,7 +392,7 @@ export function LeafletRouteMap({
   // would never initialize (the "no route preview" bug).
   return (
     <div
-      className={cn('relative rounded-3xl overflow-hidden', className)}
+      className={cn('relative z-0 isolate rounded-3xl overflow-hidden', className)}
       style={{ height: 384, minHeight: 320, width: '100%' }}
       aria-label={`Route from ${origin} to ${destination}`}
     >
