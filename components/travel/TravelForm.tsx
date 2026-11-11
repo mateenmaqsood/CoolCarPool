@@ -267,6 +267,10 @@ function AddressInput({
 /* Main form                                                             */
 /* -------------------------------------------------------------------- */
 
+/* Stable empty array — a fresh [] literal each render would re-trigger the
+   route map's init effect on every keystroke. */
+const EMPTY_WAYPOINTS: never[] = []
+
 const DEFAULTS: HostFormValues = {
   origin: '',
   destination: '',
@@ -694,7 +698,7 @@ export function TravelForm() {
                   <LeafletRouteMap
                     origin={values.origin.trim()}
                     destination={values.destination.trim()}
-                    waypoints={[]}
+                    waypoints={EMPTY_WAYPOINTS}
                     totalKm={0}
                     originLat={originCoords?.[0] ?? null}
                     originLng={originCoords?.[1] ?? null}

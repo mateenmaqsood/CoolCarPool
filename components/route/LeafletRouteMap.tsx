@@ -353,53 +353,45 @@ export function LeafletRouteMap({
     }
   }, [origin, destination, waypoints, totalKm, pickupRadiusKm, originLat, originLng, destinationLat, destinationLng])
 
-  if (loading) {
-    return (
-      <div
-        className={cn('relative', className)}
-        style={{ height: 384, minHeight: 320, width: '100%' }}
-        aria-label="Loading map..."
-        aria-busy="true"
-      >
-        <Skeleton className="h-full w-full rounded-3xl" />
-        {/* Centered pulsing pin while tiles + route load */}
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2">
-          <span className="relative flex h-12 w-12 items-center justify-center">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-25" />
-            <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-brand shadow-soft">
-              <MapPin className="h-5 w-5 text-brand-ink" />
-            </span>
-          </span>
-          <span className="text-xs font-medium text-ink-secondary">Finding the best route…</span>
-        </div>
-      </div>
-    )
-  }
-
-  if (useFallback) {
-    return (
-      <div
-        className={cn('rounded-3xl', className)}
-        style={{ minHeight: 320, width: '100%' }}
-      >
-        <SVGRouteMap
-          origin={origin}
-          destination={destination}
-          waypoints={waypoints}
-          totalKm={totalKm}
-          pickupRadiusKm={pickupRadiusKm}
-          animate
-        />
-      </div>
-    )
-  }
-
+  // NOTE: the map container div is ALWAYS mounted. The loading skeleton and
+  // SVG fallback are overlays — if this component returned early while
+  // loading, mapRef.current would be null when initMap runs and Leaflet
+  // would never initialize (the "no route preview" bug).
   return (
     <div
-      ref={mapRef}
-      className={cn('h-96 rounded-3xl overflow-hidden', className)}
+      className={cn('relative rounded-3xl overflow-hidden', className)}
       style={{ height: 384, minHeight: 320, width: '100%' }}
       aria-label={`Route from ${origin} to ${destination}`}
-    />
+    >
+      {/* Map container — permanent ref target */}
+      <div ref={mapRef} className="absolute inset-0" aria-hidden={useFallback} />
+
+      {useFallback ? (
+        <div className="absolute inset-0">
+          <SVGRouteMap
+            origin={origin}
+            destination={destination}
+            waypoints={waypoints}
+            totalKm={totalKm}
+            pickupRadiusKm={pickupRadiusKm}
+            animate
+          />
+        </div>
+      ) : loading ? (
+        <div className="absolute inset-0" aria-busy="true" aria-label="Loading map...">
+          <Skeleton className="h-full w-full rounded-3xl" />
+          {/* Centered pulsing pin while tiles + route load */}
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2">
+            <span className="relative flex h-12 w-12 items-center justify-center">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-25" />
+              <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-brand shadow-soft">
+                <MapPin className="h-5 w-5 text-brand-ink" />
+              </span>
+            </span>
+            <span className="text-xs font-medium text-ink-secondary">Finding the best route…</span>
+          </div>
+        </div>
+      ) : null}
+    </div>
   )
 }

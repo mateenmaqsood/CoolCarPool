@@ -432,6 +432,25 @@ export function TravelDetailClient({
               destinationLng={travel.destination_lng}
             />
 
+            {/* Route summary — always visible, even if map tiles fail */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-2xl bg-elevated px-4 py-3 text-sm">
+              <MapPin className="h-4 w-4 shrink-0 text-brand" aria-hidden />
+              <span className="font-semibold text-ink">{travel.origin_text}</span>
+              {[...waypoints]
+                .sort((a, b) => a.sort_order - b.sort_order)
+                .map((wp) => (
+                  <span key={wp.id} className="flex min-w-0 items-center gap-x-2">
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-ink-tertiary" aria-hidden />
+                    <span className="truncate text-ink-secondary">{wp.label}</span>
+                  </span>
+                ))}
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-ink-tertiary" aria-hidden />
+              <span className="font-semibold text-ink">{travel.destination_text}</span>
+              <span className="ml-auto shrink-0 tabular text-xs text-ink-tertiary">
+                {Math.round(travel.total_km)} km
+              </span>
+            </div>
+
             {waypoints.length > 0 && (
               <Card>
                 <CardHeader>
