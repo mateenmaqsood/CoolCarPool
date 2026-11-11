@@ -14,7 +14,7 @@ export interface SeatMapProps {
   waypoints: Waypoint[]
   currentUserId?: string | null
   isHost?: boolean
-  onRequestJoin?: (waypointId: string | null, message: string, seatsRequested?: number) => void
+  onRequestJoin?: (waypointId: string | null, kmToOrigin: number | null, message: string, seatsRequested?: number) => void
   className?: string
 }
 
@@ -45,6 +45,7 @@ export function SeatMap({
   const [selectedSeat, setSelectedSeat] = useState<number | null>(null)
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [joinWaypointId, setJoinWaypointId] = useState<string | null>(null)
+  const [joinKmTo, setJoinKmTo] = useState<number | null>(null)
   const [joinMessage, setJoinMessage] = useState('')
   const [joinSeats, setJoinSeats] = useState(1)
 
@@ -98,10 +99,11 @@ export function SeatMap({
   }
 
   const handleJoinSubmit = () => {
-    onRequestJoin?.(joinWaypointId, joinMessage, joinSeats)
+    onRequestJoin?.(joinWaypointId, joinKmTo, joinMessage, joinSeats)
     setShowJoinModal(false)
     setSelectedSeat(null)
     setJoinWaypointId(null)
+    setJoinKmTo(null)
     setJoinMessage('')
     setJoinSeats(1)
   }
@@ -110,6 +112,7 @@ export function SeatMap({
     setShowJoinModal(false)
     setSelectedSeat(null)
     setJoinWaypointId(null)
+    setJoinKmTo(null)
     setJoinMessage('')
     setJoinSeats(1)
   }
@@ -123,6 +126,7 @@ export function SeatMap({
             key={seat.index}
             seat={seat}
             travel={travel}
+            waypoints={waypoints}
             isSelected={selectedSeat === seat.index}
             onClick={() => handleSeatClick(seat.index)}
             disabled={seat.type !== 'available' || isFull}
@@ -152,6 +156,8 @@ export function SeatMap({
           travel={travel}
           selectedWaypointId={joinWaypointId}
           onWaypointChange={setJoinWaypointId}
+          kmTo={joinKmTo}
+          onKmToChange={setJoinKmTo}
           message={joinMessage}
           onMessageChange={setJoinMessage}
           seatsRequested={joinSeats}
@@ -183,16 +189,38 @@ function SeatLegendItem({
   )
 }
 
+/** Human label for the stretch a rider covers ("Faisalabad → Khanewal"). */
+function segmentLabel(
+  member: TravelMember,
+  waypoints: Waypoint[],
+  travel: Travel,
+): string {
+  const startLabel = member.is_full_route
+    ? travel.origin_text
+    : waypoints.find((w) => Math.abs(w.km_from_origin - member.km_from_origin) < 1)?.label ??
+      `${Math.round(member.km_from_origin)} km`
+  if (member.km_to_origin == null) {
+    return member.is_full_route ? 'Full route' : `${startLabel} → ${travel.destination_text}`
+  }
+  const endLabel =
+    member.km_to_origin >= travel.total_km - 1
+      ? travel.destination_text
+      : waypoints.find((w) => Math.abs(w.km_from_origin - member.km_to_origin!) < 1)?.label ??
+        `${Math.round(member.km_to_origin)} km`
+  return `${startLabel} → ${endLabel}`
+}
+
 interface SeatCardProps {
   seat: SeatData
   travel: Travel
+  waypoints: Waypoint[]
   isSelected: boolean
   onClick: () => void
   disabled: boolean
   isHost: boolean
 }
 
-function SeatCard({ seat, travel, isSelected, onClick, disabled, isHost }: SeatCardProps) {
+function SeatCard({ seat, travel, waypoints, isSelected, onClick, disabled, isHost }: SeatCardProps) {
   const { type, member, waypoint } = seat
 
   const getSeatStyle = () => {
@@ -274,9 +302,7 @@ function SeatCard({ seat, travel, isSelected, onClick, disabled, isHost }: SeatC
                 ? seat.seatPart === 0
                   ? `Booked ${seat.seatTotal} seats`
                   : `Same rider ×${seat.seatTotal}`
-                : member.is_full_route
-                  ? 'Full route'
-                  : `From ${waypoint?.label ?? `${member.km_from_origin} km`}`}
+                : segmentLabel(member, waypoints, travel)}
             </p>
           )}
         </div>
@@ -305,6 +331,8 @@ interface JoinRequestModalProps {
   travel: Travel
   selectedWaypointId: string | null
   onWaypointChange: (id: string | null) => void
+  kmTo: number | null
+  onKmToChange: (km: number | null) => void
   message: string
   onMessageChange: (msg: string) => void
   seatsRequested: number
@@ -319,6 +347,8 @@ function JoinRequestModal({
   travel,
   selectedWaypointId,
   onWaypointChange,
+  kmTo,
+  onKmToChange,
   message,
   onMessageChange,
   seatsRequested,
@@ -403,6 +433,64 @@ function JoinRequestModal({
               })}
             </div>
           </fieldset>
+
+          {/* Sub-portion rides: pick your drop-off when joining mid-route */}
+          {selectedWaypointId ? (
+            <div>
+              <p className="text-sm font-medium text-ink mb-2">Get off at</p>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 rounded-2xl bg-card p-3 cursor-pointer transition-colors hover:ring-2 hover:ring-brand-soft">
+                  <input
+                    type="radio"
+                    name="dropOff"
+                    checked={kmTo == null}
+                    onChange={() => onKmToChange(null)}
+                    className="sr-only peer"
+                  />
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-line transition-all peer-checked:border-brand peer-checked:bg-brand" />
+                  <div className="flex-1">
+                    <p className="font-medium text-ink">Destination — {travel.destination_text}</p>
+                    <p className="text-xs text-ink-tertiary">Ride the rest of the route</p>
+                  </div>
+                </label>
+                {waypoints
+                  .filter((w) => {
+                    const pickupKm = waypoints.find((p) => p.id === selectedWaypointId)?.km_from_origin ?? 0
+                    return w.km_from_origin > pickupKm + 1
+                  })
+                  .map((wp) => (
+                    <label key={wp.id} className="flex items-center gap-3 rounded-2xl bg-card p-3 cursor-pointer transition-colors hover:ring-2 hover:ring-brand-soft">
+                      <input
+                        type="radio"
+                        name="dropOff"
+                        checked={kmTo != null && Math.abs(kmTo - wp.km_from_origin) < 1}
+                        onChange={() => onKmToChange(wp.km_from_origin)}
+                        className="sr-only peer"
+                      />
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-line transition-all peer-checked:border-brand peer-checked:bg-brand" />
+                      <div className="flex-1">
+                        <p className="font-medium text-ink">{wp.label}</p>
+                        <p className="text-xs text-ink-tertiary">Get off at km {Math.round(wp.km_from_origin)}</p>
+                      </div>
+                    </label>
+                  ))}
+              </div>
+              {/* Live segment estimate for the chosen sub-portion */}
+              {(() => {
+                const pickupKm = waypoints.find((p) => p.id === selectedWaypointId)?.km_from_origin ?? 0
+                const segKm = Math.max(0, Math.round((kmTo ?? travel.total_km) - pickupKm))
+                const estShare =
+                  travel.total_km > 0
+                    ? Math.round((segKm / travel.total_km) * (travel.estimated_cost_pkr ?? 0))
+                    : 0
+                return (
+                  <p className="mt-2 rounded-2xl bg-brand-soft px-3 py-2 text-xs text-ink">
+                    Your stretch: <strong>{segKm} km</strong> · est. share <strong>{estShare.toLocaleString('en-PK')} PKR</strong> (per-km × your km, rest split among full-route riders)
+                  </p>
+                )
+              })()}
+            </div>
+          ) : null}
 
           {/* BUG 1: how many seats? */}
           <div>

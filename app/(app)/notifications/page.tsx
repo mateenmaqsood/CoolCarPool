@@ -49,6 +49,12 @@ function getNotificationContent(n: Notification): { title: string; body: string;
         body: `${p.travel_origin ?? 'Your ride'} is now locked — no more requests accepted`,
         icon: <Lock className="h-5 w-5 text-warn" />
       }
+    case 'travel_cancelled':
+      return {
+        title: 'Ride cancelled',
+        body: `${p.travel_origin ?? 'Your ride'} → ${p.travel_destination ?? 'destination'} was cancelled by the host`,
+        icon: <Truck className="h-5 w-5 text-[var(--error)]" />
+      }
     case 'bill_uploaded':
       return {
         title: 'Receipt uploaded',

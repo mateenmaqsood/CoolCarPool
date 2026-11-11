@@ -5,6 +5,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { ProfileSignOut } from '@/components/profile/ProfileSignOut'
+import { CancelRideButton } from '@/components/profile/CancelRideButton'
 import { cn } from '@/lib/utils'
 
 export const revalidate = 60
@@ -39,6 +40,27 @@ async function getHostedCount(userId: string) {
   return count ?? 0
 }
 
+interface HostedRide {
+  id: string
+  origin_text: string
+  destination_text: string
+  departure_at: string
+  total_seats: number
+  available_seats: number
+  status: string
+}
+
+async function getHostedTravels(userId: string): Promise<HostedRide[]> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('travels')
+    .select('id, origin_text, destination_text, departure_at, total_seats, available_seats, status')
+    .eq('host_id', userId)
+    .neq('status', 'cancelled')
+    .order('departure_at', { ascending: true })
+  return (data as HostedRide[]) ?? []
+}
+
 async function getJoinedCount(userId: string) {
   const supabase = createClient()
   const { count } = await supabase.from('travel_members').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('is_host', false)
@@ -55,10 +77,11 @@ export default async function ProfilePage() {
     return <div className="flex min-h-dvh items-center justify-center">Not logged in</div>
   }
 
-  const [profile, hostedCount, joinedCount] = await Promise.all([
+  const [profile, hostedCount, joinedCount, hostedTravels] = await Promise.all([
     getProfile(user.id),
     getHostedCount(user.id),
     getJoinedCount(user.id),
+    getHostedTravels(user.id),
   ])
 
   const genderBadgeVariant = {
@@ -170,6 +193,54 @@ export default async function ProfilePage() {
           </Link>
         )}
       </div>
+
+      {/* My hosted rides — with cancel for rides still open/locked */}
+      {hostedTravels.length > 0 ? (
+        <div className="mt-6 rounded-3xl bg-card p-6 shadow-soft">
+          <h3 className="text-lg font-semibold text-ink mb-4 flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-brand" />
+            My hosted rides
+          </h3>
+          <div className="flex flex-col gap-3">
+            {hostedTravels.map((ride) => (
+              <div
+                key={ride.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-elevated p-4"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-ink">
+                    {ride.origin_text} → {ride.destination_text}
+                  </p>
+                  <p className="text-xs text-ink-secondary">
+                    {new Date(ride.departure_at).toLocaleString('en-PK', {
+                      weekday: 'short',
+                      day: 'numeric',
+                      month: 'short',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}{' '}
+                    · {ride.available_seats}/{ride.total_seats} seats free
+                    {ride.status === 'locked' ? ' · locked' : ''}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Link href={`/travel/${ride.id}`}>
+                    <Button variant="secondary" size="sm">
+                      View
+                    </Button>
+                  </Link>
+                  {ride.status === 'open' || ride.status === 'locked' ? (
+                    <CancelRideButton
+                      ride={{ id: ride.id, origin_text: ride.origin_text, destination_text: ride.destination_text }}
+                      compact
+                    />
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {/* Sign out — lives here on mobile (bottom nav has 4 clean tabs) */}
       <div className="mt-8">

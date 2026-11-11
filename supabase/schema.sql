@@ -50,7 +50,7 @@ CREATE TABLE travels (
   estimated_cost_pkr  INT,
   description         TEXT,
   status              TEXT NOT NULL DEFAULT 'open'
-                        CHECK (status IN ('open','locked','in_progress','completed','settled','merged')),
+                        CHECK (status IN ('open','locked','in_progress','completed','settled','merged','cancelled')),
   merged_into_id      UUID REFERENCES travels(id),
   created_at          TIMESTAMPTZ DEFAULT NOW()
 );
@@ -87,6 +87,7 @@ CREATE TABLE travel_requests (
                      CHECK (status IN ('pending','accepted','rejected','cancelled')),
   message          TEXT,
   seats_requested  INT NOT NULL DEFAULT 1 CHECK (seats_requested >= 1 AND seats_requested <= 4),
+  km_to_origin     FLOAT,
   created_at       TIMESTAMPTZ DEFAULT NOW()
   -- NOTE: no UNIQUE(travel_id, requester_id) — users may request again after
   -- a rejection and may reserve multiple seats (BUG 1).
@@ -102,6 +103,7 @@ CREATE TABLE travel_members (
   is_host          BOOLEAN DEFAULT FALSE,
   is_full_route    BOOLEAN DEFAULT TRUE,
   km_from_origin   FLOAT NOT NULL DEFAULT 0,
+  km_to_origin     FLOAT,
   seats_reserved   INT NOT NULL DEFAULT 1 CHECK (seats_reserved >= 1 AND seats_reserved <= 4),
   joined_at        TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(travel_id, user_id)
@@ -445,3 +447,24 @@ DROP POLICY IF EXISTS "avatars_delete_own" ON storage.objects;
 CREATE POLICY "avatars_delete_own" ON storage.objects FOR DELETE USING (
   bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]
 );
+
+-- ============================================================
+-- HOTFIX BATCH 3 — sub-portion rides (both endpoints mid-route)
+-- km_to_origin NULL = rides to the destination (backward compatible).
+-- ============================================================
+ALTER TABLE travel_requests ADD COLUMN IF NOT EXISTS km_to_origin FLOAT;
+ALTER TABLE travel_members  ADD COLUMN IF NOT EXISTS km_to_origin FLOAT;
+
+-- Allow cancelling travels (host action from the Profile page)
+ALTER TABLE travels DROP CONSTRAINT IF EXISTS travels_status_check;
+ALTER TABLE travels ADD CONSTRAINT travels_status_check
+  CHECK (status IN ('open','locked','in_progress','completed','settled','merged','cancelled'));
+
+-- ============================================================
+-- NOTIFICATIONS — split policies (passenger notifies the host)
+-- ============================================================
+DROP POLICY IF EXISTS "notifs_own" ON notifications;
+CREATE POLICY "notifs_select_own" ON notifications FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "notifs_update_own" ON notifications FOR UPDATE USING (user_id = auth.uid());
+CREATE POLICY "notifs_delete_own" ON notifications FOR DELETE USING (user_id = auth.uid());
+CREATE POLICY "notifs_insert_auth" ON notifications FOR INSERT WITH CHECK (auth.role() = 'authenticated');

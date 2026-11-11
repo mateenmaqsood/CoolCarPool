@@ -401,6 +401,30 @@ export function TravelForm() {
   /* ---------------- Submission + duplicate pipeline ---------------- */
 
   /**
+   * Fare-minimum guard — shared by EVERY submit path (Next button, Enter
+   * key, Post). Previously the check only lived in goNext(), so pressing
+   * Enter posted the ride even when the price was below the minimum.
+   */
+  function validateFareMinimum(): boolean {
+    if (tripEstimate.distanceKm <= 0) return true
+    const cost = getValues('estimated_cost_pkr')
+    const minTotal = tripEstimate.minPerSeatPkr * (values.total_seats ?? 1)
+    if (cost < minTotal) {
+      form.setError('estimated_cost_pkr', {
+        message: `Minimum is PKR ${minTotal} for this route (${tripEstimate.distanceKm} km → est. PKR ${tripEstimate.totalPkr} total)`,
+      })
+      setStep(2)
+      toast({
+        title: 'Price below the minimum',
+        description: `Your offer is under PKR ${minTotal} — raise it to post this ride.`,
+        variant: 'warning',
+      })
+      return false
+    }
+    return true
+  }
+
+  /**
    * Insert the travel row + host membership. Returns the new travel id,
    * or null on failure (toast shown). No navigation side effects.
    */
@@ -488,6 +512,7 @@ export function TravelForm() {
 
   /** Post the ride as its own travel (the "Keep Separate" path). */
   async function createTravel() {
+    if (!validateFareMinimum()) return
     const newId = await insertTravel()
     setDupOpen(false)
     setDupMatches(null)
@@ -515,9 +540,9 @@ export function TravelForm() {
       return
     }
 
+    if (!validateFareMinimum()) return
     const candidateId = await insertTravel()
     if (!candidateId) return
-
     const fallbackToSeparate = () => {
       toast({
         title: 'Merge could not complete',
@@ -567,6 +592,7 @@ export function TravelForm() {
   async function submitTravel() {
     const ok = await form.trigger(HOST_STEP_FIELDS[3] as never)
     if (!ok) return
+    if (!validateFareMinimum()) return
     if (!departureIso) {
       toast({ title: 'Fix your departure time first', variant: 'warning' })
       setStep(1)

@@ -116,7 +116,7 @@ export function TravelDetailClient({
 
   // Host: use passed pending requests (from travel_requests table)
 
-  const handleRequestJoin = async (waypointId: string | null, message: string, seatsRequested = 1) => {
+  const handleRequestJoin = async (waypointId: string | null, kmToOrigin: number | null, message: string, seatsRequested = 1) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { toast({ title: 'Please log in first', variant: 'error' }); return }
 
@@ -172,6 +172,7 @@ export function TravelDetailClient({
         requester_id: user.id,
         waypoint_id: waypointId ?? null,
         km_from_origin: selectedWp?.km_from_origin ?? 0,
+        km_to_origin: kmToOrigin,
         message: message.trim() || null,
         status: 'pending',
         seats_requested: seatsRequested,
@@ -232,6 +233,7 @@ export function TravelDetailClient({
           is_host: false,
           is_full_route: req.waypoint_id === null,
           km_from_origin: req.km_from_origin,
+          km_to_origin: req.km_to_origin ?? null,
           seats_reserved: req.seats_requested ?? 1,
         })
       }

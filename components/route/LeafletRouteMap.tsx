@@ -5,6 +5,7 @@ import { MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { SVGRouteMap } from './SVGRouteMap'
+import { shortestRouteBetween, GRAPH_NODES } from '@/lib/route-graph'
 // Leaflet's stylesheet is required — without it the panes/tiles render
 // unpositioned and the map appears as a blank box.
 import 'leaflet/dist/leaflet.css'
@@ -207,7 +208,23 @@ export function LeafletRouteMap({
           console.warn('[LeafletRouteMap] OSRM failed, using straight line:', e)
         }
 
-        // If OSRM failed, use straight line
+        // If OSRM failed, route over the Pakistan highway graph with A*
+        // (shortest path through real cities — believable polyline + km).
+        if (routeCoords.length === 0) {
+          const shortest = shortestRouteBetween(origin, destination)
+          if (shortest && shortest.path.length >= 2) {
+            const pathNodes = shortest.path
+              .map((name) => GRAPH_NODES.find((n) => n.name.toLowerCase() === name.toLowerCase()))
+              .filter((n): n is NonNullable<typeof n> => Boolean(n))
+            if (pathNodes.length >= 2) {
+              routeCoords = pathNodes.map((n) => [n.lat, n.lng] as [number, number])
+              routeDistance = shortest.totalKm
+              routeDuration = shortest.totalKm // ~60 km/h
+            }
+          }
+        }
+
+        // Last resort: straight line between the endpoints
         if (routeCoords.length === 0) {
           routeCoords = [[oLat, oLng], [dLat, dLng]]
           // Approximate distance using haversine

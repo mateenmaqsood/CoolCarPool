@@ -31,6 +31,7 @@ export type PickupRadiusKm = 1 | 2 | 3
 export type TravelStatus =
   | 'open'
   | 'locked'
+  | 'cancelled'
   | 'in_progress'
   | 'completed'
   | 'settled'
@@ -48,6 +49,7 @@ export const NOTIFICATION_TYPES = [
   'member_joined',
   'member_left',
   'travel_locked',
+  'travel_cancelled',
   'bill_uploaded',
   'bill_acknowledged',
   'duplicate_found',
@@ -118,6 +120,7 @@ export type TravelRequest = {
   requester_id: string
   waypoint_id: string | null
   km_from_origin: number
+  km_to_origin?: number | null
   status: TravelRequestStatus
   message: string | null
   seats_requested?: number
@@ -131,6 +134,7 @@ export type TravelMember = {
   is_host: boolean
   is_full_route: boolean
   km_from_origin: number
+  km_to_origin?: number | null
   seats_reserved?: number
   joined_at: string
 }

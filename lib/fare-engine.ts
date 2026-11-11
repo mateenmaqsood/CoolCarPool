@@ -32,6 +32,12 @@ export interface TravelMemberCostInput {
   isFullRoute: boolean
   /** Distance of this traveler's pickup point from the route origin, in km. Use 0 for full-route riders or at the origin. */
   kmFromOrigin: number
+  /**
+   * Distance of this traveler's DROP-OFF point from the route origin, in km.
+   * Sub-portion riders (pickup AND drop-off both mid-route) set both.
+   * Omitted/null = rides to the destination (totalTripKm).
+   */
+  kmToOrigin?: number | null
 }
 
 export interface CalculateFareParams {
@@ -104,7 +110,10 @@ export function calculateTripFares(params: CalculateFareParams): FareEngineResul
   // STEPS 2–3 — mid-route travelers pay only for the stretch they ride.
   midRouteMembers.forEach((m) => {
     const kmFromOrigin = sanitizeKmFromOrigin(m.kmFromOrigin, totalTripKm)
-    const kmCovered = totalTripKm - kmFromOrigin
+    // Sub-portion riders may have BOTH endpoints mid-route: their covered km
+    // is kmToOrigin − kmFromOrigin (kmToOrigin omitted = rides to the end).
+    const kmTo = Math.min(totalTripKm, sanitizeKmFromOrigin(m.kmToOrigin ?? totalTripKm, totalTripKm))
+    const kmCovered = Math.max(kmTo - kmFromOrigin, 0)
     const farePkr = Math.round(kmCovered * perKmRatePkr)
     midRouteTotalPkr += farePkr
 
@@ -163,6 +172,7 @@ export interface TravelMemberRowLike {
   is_host: boolean
   is_full_route: boolean
   km_from_origin: number | null
+  km_to_origin?: number | null
 }
 
 /**
@@ -182,6 +192,7 @@ export function travelMemberCostInputsFromRows(
       // A row sitting at km 0 of the route rides the whole trip.
       isFullRoute: row.is_full_route || kmFromOrigin <= 0,
       kmFromOrigin: row.is_full_route ? 0 : kmFromOrigin,
+      kmToOrigin: row.is_full_route ? null : (row.km_to_origin ?? null),
     }
   })
 }
