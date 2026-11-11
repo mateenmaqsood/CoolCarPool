@@ -262,9 +262,13 @@ CREATE POLICY "messages_insert" ON messages FOR INSERT WITH CHECK (
   AND EXISTS (SELECT 1 FROM travel_members WHERE travel_id = messages.travel_id AND user_id = auth.uid())
 );
 
--- NOTIFICATIONS (own only)
-CREATE POLICY "notifs_own" ON notifications FOR ALL USING (user_id = auth.uid());
-
+-- NOTIFICATIONS — split policies: everyone reads/edits their own, but any
+-- authenticated user may INSERT a notification targeting someone else
+-- (e.g. a passenger notifying the host of a seat request).
+CREATE POLICY "notifs_select_own" ON notifications FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "notifs_update_own" ON notifications FOR UPDATE USING (user_id = auth.uid());
+CREATE POLICY "notifs_delete_own" ON notifications FOR DELETE USING (user_id = auth.uid());
+CREATE POLICY "notifs_insert_auth" ON notifications FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 -- BILL SLIPS (members select, host insert/update)
 CREATE POLICY "slips_select" ON bill_slips FOR SELECT USING (
   EXISTS (SELECT 1 FROM travel_members WHERE travel_id = bill_slips.travel_id AND user_id = auth.uid())

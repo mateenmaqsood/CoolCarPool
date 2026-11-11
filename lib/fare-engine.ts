@@ -222,3 +222,46 @@ export function membersFromTravelRow(
 }
 
 export type { TravelMember }
+
+/* ==========================================================================
+   Trip cost estimator (pre-posting) — distance-based pricing
+   ==========================================================================
+   Base Cost (PKR)   = Distance (km) × RATE_PER_KM (12) + BASE_TOLL_PKR (150)
+   Min per seat (PKR) = max(Base Cost ÷ seats, Distance × MIN_PER_KM (8))
+   ========================================================================== */
+
+/** Rate used for the estimated base trip cost. */
+export const RATE_PER_KM_PKR = 12
+/** Flat toll/loading fee added on top of the distance rate. */
+export const BASE_TOLL_PKR = 150
+/** Floor per-seat rate so very short rides still cover fuel. */
+export const MIN_PER_KM_PKR = 8
+
+export interface TripCostEstimate {
+  /** Estimated total trip cost: km × 12 + 150. */
+  totalPkr: number
+  /** Minimum fair price per passenger: max(total ÷ seats, km × 8). */
+  minPerSeatPkr: number
+  distanceKm: number
+  seats: number
+}
+
+export function haversineKm(a: [number, number], b: [number, number]): number {
+  const R = 6371
+  const dLat = ((b[0] - a[0]) * Math.PI) / 180
+  const dLon = ((b[1] - a[1]) * Math.PI) / 180
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((a[0] * Math.PI) / 180) *
+      Math.cos((b[0] * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x))
+}
+
+export function estimateTripCost(distanceKm: number, seats: number): TripCostEstimate {
+  const km = Math.max(0, Math.round(distanceKm))
+  const n = Math.max(1, Math.round(seats))
+  const totalPkr = Math.round(km * RATE_PER_KM_PKR + BASE_TOLL_PKR)
+  const minPerSeatPkr = Math.max(Math.round(totalPkr / n), km * MIN_PER_KM_PKR)
+  return { totalPkr, minPerSeatPkr, distanceKm: km, seats: n }
+}

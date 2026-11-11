@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge, type BadgeProps } from '@/components/ui/Badge'
+import { estimateTripCost } from '@/lib/fare-engine'
 import type { FeedTravel, FeedHost } from '@/lib/mock-data'
 import type { GenderPreference } from '@/types'
 import { cn, formatPKR, formatDeparture, timeUntil } from '@/lib/utils'
@@ -121,11 +122,19 @@ export function TravelCard({ travel, isOwn, className }: TravelCardProps) {
           </Badge>
           <SeatsPill available={travel.available_seats} />
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <Wallet className="h-3.5 w-3.5 text-ink-tertiary" aria-hidden />
-          <span className="text-sm font-semibold text-ink">
+        <div className="flex shrink-0 flex-col items-end">
+          <span className="flex items-center gap-1.5">
+            <Wallet className="h-3.5 w-3.5 text-ink-tertiary" aria-hidden />
+            <span className="text-sm font-semibold text-ink">
             ≈ {formatPKR(travel.estimated_cost_pkr ?? 0)}
+            </span>
           </span>
+          {/* Fare engine: fair per-seat floor for this distance (BUG 3) */}
+          {travel.total_km > 0 && travel.total_seats > 0 ? (
+            <span className="text-[10px] tabular text-ink-tertiary">
+              min {formatPKR(estimateTripCost(travel.total_km, travel.total_seats).minPerSeatPkr)}/seat
+            </span>
+          ) : null}
         </div>
       </div>
 

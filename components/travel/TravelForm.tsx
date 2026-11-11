@@ -11,6 +11,7 @@ import {
   Car,
   Check,
   ClipboardCheck,
+  Loader2,
   MapPin,
   Minus,
   Plus,
@@ -42,6 +43,8 @@ import {
   type HostFormValues,
 } from '@/lib/validations'
 import { cn, formatPKR, combineDateAndTime } from '@/lib/utils'
+import { searchAddresses, type GeoResult } from '@/lib/geocode'
+import { estimateTripCost } from '@/lib/fare-engine'
 
 /* -------------------------------------------------------------------- */
 /* Stepper                                                               */
@@ -144,6 +147,122 @@ function CityPills({ onSelect, selected }: { onSelect: (city: string) => void; s
   )
 }
 
+/**
+ * Address combobox — accepts full landmark/address strings (e.g.
+ * "Packages Mall, Lahore"), with debounced Nominatim suggestions.
+ * Calls onPick with the chosen label and its coordinates (null = unresolved;
+ * the route map then falls back to its own CITY_COORDS/Nominatim lookup).
+ */
+function AddressInput({
+  label,
+  placeholder,
+  value,
+  onPick,
+  error,
+}: {
+  label: string
+  placeholder: string
+  value: string
+  onPick: (text: string, coords: [number, number] | null) => void
+  error?: string
+}) {
+  const [query, setQuery] = useState(value)
+  const [results, setResults] = useState<GeoResult[]>([])
+  const [open, setOpen] = useState(false)
+  const [searching, setSearching] = useState(false)
+
+  // Keep the field in sync when the value is set from outside (city pills).
+  useEffect(() => {
+    setQuery(value)
+  }, [value])
+
+  // Debounced Nominatim lookup (>= 3 chars, ~1 req/400ms — within courtesy).
+  useEffect(() => {
+    if (query.trim() === value.trim()) return
+    const t = setTimeout(async () => {
+      const q = query.trim()
+      if (q.length < 3) {
+        setResults([])
+        setOpen(false)
+        return
+      }
+      setSearching(true)
+      const r = await searchAddresses(q)
+      setResults(r)
+      setOpen(r.length > 0)
+      setSearching(false)
+    }, 400)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query])
+
+  function pick(r: GeoResult) {
+    setQuery(r.shortLabel)
+    setOpen(false)
+    setResults([])
+    onPick(r.shortLabel, [r.lat, r.lng])
+  }
+
+  async function commitFreeText() {
+    const q = query.trim()
+    if (!q || q === value.trim()) return
+    setSearching(true)
+    const geo = await searchAddresses(q, 1)
+    setSearching(false)
+    if (geo.length > 0) {
+      setQuery(geo[0].shortLabel)
+      onPick(geo[0].shortLabel, [geo[0].lat, geo[0].lng])
+    } else {
+      // Unresolved — the route map will try CITY_COORDS / full geocode itself.
+      onPick(q, null)
+    }
+  }
+
+  return (
+    <div className="relative">
+      <Input
+        label={label}
+        placeholder={placeholder}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onFocus={() => results.length > 0 && setOpen(true)}
+        onBlur={() => {
+          // Delay so suggestion clicks land before the dropdown closes.
+          setTimeout(() => setOpen(false), 150)
+          void commitFreeText()
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            if (results.length > 0 && open) pick(results[0])
+            else void commitFreeText()
+          }
+        }}
+        leftIcon={<MapPin className="h-4 w-4" />}
+        rightSlot={searching ? <Loader2 className="h-4 w-4 animate-spin text-ink-tertiary" /> : null}
+        autoComplete="off"
+        error={error}
+      />
+      {open ? (
+        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-2xl bg-elevated shadow-float">
+          {results.map((r) => (
+            <button
+              key={r.label}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pick(r)}
+              className="flex w-full flex-col items-start gap-0.5 px-4 py-2.5 text-left transition-colors hover:bg-sunken"
+            >
+              <span className="text-sm font-medium text-ink">{r.shortLabel}</span>
+              <span className="truncate text-xs text-ink-tertiary">{r.label}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 /* -------------------------------------------------------------------- */
 /* Main form                                                             */
 /* -------------------------------------------------------------------- */
@@ -177,6 +296,9 @@ export function TravelForm() {
   const [dupOpen, setDupOpen] = useState(false)
   const [banner, setBanner] = useState<DuplicateMatchView[]>([])
   const [routeKm, setRouteKm] = useState<number>(0)
+  // Geocoded coordinates for the route endpoints (null = map resolves itself).
+  const [originCoords, setOriginCoords] = useState<[number, number] | null>(null)
+  const [destCoords, setDestCoords] = useState<[number, number] | null>(null)
 
   const form = useForm<HostFormValues>({
     resolver: zodResolver(hostFormSchema),
@@ -229,18 +351,26 @@ export function TravelForm() {
     return `≈ ${formatPKR(per)} per head (incl. you) before the KM split`
   }, [values.total_seats, values.estimated_cost_pkr])
 
+  /* Fare engine (BUG 3): distance-based estimate + fair per-seat floor. */
+  const tripEstimate = useMemo(
+    () => estimateTripCost(routeKm, values.total_seats ?? 1),
+    [routeKm, values.total_seats],
+  )
+
   function goNext() {
     const fields = HOST_STEP_FIELDS[step]
     void form
       .trigger(fields as never)
       .then((ok) => {
         if (ok) {
-          // Task 7: enforce minimum cost = routeKm * 20 on step 2 (Details)
-          if (step === 2 && routeKm > 0) {
+          // Fare engine minimum: total must cover minPerSeat × seats
+          // (km × 12 + 150 toll, floor km × 8 per seat).
+          if (step === 2 && tripEstimate.distanceKm > 0) {
             const cost = getValues('estimated_cost_pkr')
-            if (cost < routeKm * 20) {
+            const minTotal = tripEstimate.minPerSeatPkr * (values.total_seats ?? 1)
+            if (cost < minTotal) {
               form.setError('estimated_cost_pkr', {
-                message: `Minimum is PKR ${routeKm * 20} for this ${routeKm} km route (${routeKm} km × PKR 20/km)`
+                message: `Minimum is PKR ${minTotal} for this route (${tripEstimate.distanceKm} km → est. PKR ${tripEstimate.totalPkr} total)`
               })
               return
             }
@@ -297,7 +427,11 @@ export function TravelForm() {
       const { data, error } = await supabase.from('travels').insert({
         host_id: user.id,  // CRITICAL: fresh user.id, not profile?.id
         origin_text: v.origin.trim(),
+        origin_lat: originCoords?.[0] ?? null,
+        origin_lng: originCoords?.[1] ?? null,
         destination_text: v.destination.trim(),
+        destination_lat: destCoords?.[0] ?? null,
+        destination_lng: destCoords?.[1] ?? null,
         total_km: routeKm ?? 0,
         departure_at: departureIso ?? new Date().toISOString(),
         is_recurring: v.is_recurring,
@@ -520,27 +654,39 @@ export function TravelForm() {
                 <MapPin className="h-4 w-4 text-brand" />
                 Where does this ride run?
               </div>
-              <Input
+              <AddressInput
                 label="From (origin)"
-                placeholder="e.g. Lahore"
-                leftIcon={<MapPin className="h-4 w-4" />}
-                {...register('origin')}
+                placeholder="e.g. Packages Mall, Lahore"
+                value={values.origin ?? ''}
+                onPick={(text, coords) => {
+                  setValue('origin', text, { shouldValidate: true })
+                  setOriginCoords(coords)
+                }}
                 error={errors.origin?.message?.toString()}
               />
               <CityPills
                 selected={values.origin ?? ''}
-                onSelect={(city) => setValue('origin', city, { shouldValidate: true })}
+                onSelect={(city) => {
+                  setValue('origin', city, { shouldValidate: true })
+                  setOriginCoords(null)
+                }}
               />
-              <Input
+              <AddressInput
                 label="To (destination)"
-                placeholder="e.g. Murree"
-                leftIcon={<ArrowRight className="h-4 w-4" />}
-                {...register('destination')}
+                placeholder="e.g. FAST NUCES CFD Campus"
+                value={values.destination ?? ''}
+                onPick={(text, coords) => {
+                  setValue('destination', text, { shouldValidate: true })
+                  setDestCoords(coords)
+                }}
                 error={destination_error?.toString()}
               />
               <CityPills
                 selected={values.destination ?? ''}
-                onSelect={(city) => setValue('destination', city, { shouldValidate: true })}
+                onSelect={(city) => {
+                  setValue('destination', city, { shouldValidate: true })
+                  setDestCoords(null)
+                }}
               />
               {(values.origin?.trim() && values.destination?.trim()) && (
                 <div className="mt-4 pt-4 border-t border-line">
@@ -550,6 +696,10 @@ export function TravelForm() {
                     destination={values.destination.trim()}
                     waypoints={[]}
                     totalKm={0}
+                    originLat={originCoords?.[0] ?? null}
+                    originLng={originCoords?.[1] ?? null}
+                    destinationLat={destCoords?.[0] ?? null}
+                    destinationLng={destCoords?.[1] ?? null}
                     onRouteCalculated={(km) => setRouteKm(km)}
                   />
                 </div>
@@ -699,6 +849,24 @@ export function TravelForm() {
                 />
               </div>
 
+              {/* Fare engine estimate — distance-based pricing (BUG 3) */}
+              {tripEstimate.distanceKm > 0 ? (
+                <div className="flex items-center justify-between gap-3 rounded-2xl bg-elevated p-4">
+                  <div>
+                    <p className="text-xs text-ink-tertiary">Estimated total trip cost</p>
+                    <p className="text-lg font-bold tabular text-ink">
+                      {formatPKR(tripEstimate.totalPkr)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-ink-tertiary">Min recommended / passenger</p>
+                    <p className="text-lg font-bold tabular text-brand">
+                      {formatPKR(tripEstimate.minPerSeatPkr)}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
               {/* Estimated cost */}
               <Input
                 label="Estimated total cost (PKR)"
@@ -706,9 +874,11 @@ export function TravelForm() {
                 inputMode="numeric"
                 leftIcon={<Wallet className="h-4 w-4" />}
                 rightSlot="PKR total"
-                helperText={routeKm > 0
-                  ? `Min PKR ${routeKm * 20} for ${routeKm} km · ${perSeatHint ?? ''}`
-                  : perSeatHint ?? 'Fuel + tolls for the whole route — split later'}
+                helperText={
+                  tripEstimate.distanceKm > 0
+                    ? `km × PKR 12 + PKR 150 toll = ${formatPKR(tripEstimate.totalPkr)} · floor ${formatPKR(tripEstimate.minPerSeatPkr)}/seat${perSeatHint ? ` · ${perSeatHint}` : ''}`
+                    : perSeatHint ?? 'Fuel + tolls for the whole route — split later'
+                }
                 {...register('estimated_cost_pkr', { valueAsNumber: true })}
                 error={errors.estimated_cost_pkr?.message?.toString()}
               />

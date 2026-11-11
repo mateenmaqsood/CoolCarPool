@@ -181,6 +181,26 @@ export function TravelDetailClient({
         return
       }
       toast({ title: 'Request sent! 🚗', description: 'Host will review shortly.', variant: 'success' })
+
+      // BUG 2: alert the host in real-time — bell badge + notifications page.
+      // Schema: notifications(type, travel_id, payload JSONB) — no title/body cols.
+      const { data: requesterProfile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single()
+      await supabase.from('notifications').insert({
+        user_id: travel.host_id,
+        type: 'request_received',
+        travel_id: travel.id,
+        payload: {
+          requester_name: requesterProfile?.full_name ?? user.user_metadata?.full_name ?? 'Someone',
+          travel_origin: travel.origin_text,
+          travel_destination: travel.destination_text,
+        },
+        read: false,
+      })
+
       router.refresh()
     } catch (err: unknown) {
       toast({ title: 'Request failed', description: err instanceof Error ? err.message : 'Unknown', variant: 'error' })
@@ -406,6 +426,10 @@ export function TravelDetailClient({
               waypoints={waypoints}
               totalKm={travel.total_km}
               pickupRadiusKm={travel.pickup_radius_km}
+              originLat={travel.origin_lat}
+              originLng={travel.origin_lng}
+              destinationLat={travel.destination_lat}
+              destinationLng={travel.destination_lng}
             />
 
             {waypoints.length > 0 && (

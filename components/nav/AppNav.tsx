@@ -216,6 +216,7 @@ function TabBar() {
 
   useEffect(() => {
     let cancelled = false
+    let channel: ReturnType<typeof supabase.channel> | null = null
     ;(async () => {
       const {
         data: { user },
@@ -227,8 +228,24 @@ function TabBar() {
         .eq('user_id', user.id)
         .eq('read', false)
       if (!cancelled) setUnreadCount(count ?? 0)
+
+      // Live badge: bump on any new notification for this user (BUG 2).
+      channel = supabase
+        .channel(`nav-notifications-${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+          (payload) => {
+            const read = (payload.new as { read?: boolean } | null)?.read
+            if (!read) setUnreadCount((c) => c + 1)
+          },
+        )
+        .subscribe()
     })()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      if (channel) void supabase.removeChannel(channel)
+    }
   }, [supabase])
 
   return (

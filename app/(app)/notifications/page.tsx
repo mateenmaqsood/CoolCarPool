@@ -102,7 +102,34 @@ export default function NotificationsPage() {
       }
       if (!cancelled) setLoading(false)
     })()
-    return () => { cancelled = true }
+
+    // BUG 2: live updates — new notifications appear without a refresh.
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+      channel = supabase
+        .channel(`notifications-page-${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+          (payload) => {
+            const row = payload.new as Notification | null
+            if (!row) return
+            setNotifications((prev) => [row, ...prev])
+            // It lands unread; mark it read so the count stays honest.
+            void supabase.from('notifications').update({ read: true }).eq('id', row.id)
+          },
+        )
+        .subscribe()
+    })()
+
+    return () => {
+      cancelled = true
+      if (channel) void supabase.removeChannel(channel)
+    }
   }, [supabase])
 
   const formatTime = (iso: string) => {
