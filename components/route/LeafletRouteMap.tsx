@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { SVGRouteMap } from './SVGRouteMap'
+// Leaflet's stylesheet is required — without it the panes/tiles render
+// unpositioned and the map appears as a blank box.
+import 'leaflet/dist/leaflet.css'
 
 export interface WaypointForMap {
   id: string
@@ -46,8 +50,11 @@ export function LeafletRouteMap({
 }: LeafletRouteMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
+  const observerRef = useRef<ResizeObserver | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Any init/geocode/tile failure degrades to the animated SVG route map so a
+  // visual map is ALWAYS displayed.
+  const [useFallback, setUseFallback] = useState(false)
   const [routeCalculated, setRouteCalculated] = useState(false)
 
   useEffect(() => {
@@ -78,6 +85,14 @@ export function LeafletRouteMap({
         }).setView([30.3753, 69.3451], 6)
 
         mapInstanceRef.current = map
+
+        // Leaflet renders 0-size tiles when the container resizes after init
+        // (tab switches, mobile layout). Invalidate on any container resize.
+        const resizeObserver = new ResizeObserver(() => {
+          if (!cancelled) map.invalidateSize()
+        })
+        resizeObserver.observe(mapRef.current)
+        observerRef.current = resizeObserver
 
         // Add OpenStreetMap tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -158,7 +173,8 @@ export function LeafletRouteMap({
               Math.cos((dLat * Math.PI) / 180) *
               Math.sin(dLngRad / 2) ** 2
           routeDistance = 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-          routeDuration = routeDistance / 60 * 60 // rough 60 km/h
+          // Rough 60 km/h → 1 minute per km
+          routeDuration = routeDistance
         }
 
         // Draw route polyline
@@ -248,8 +264,8 @@ export function LeafletRouteMap({
         setRouteCalculated(true)
       } catch (e) {
         if (!cancelled) {
-          console.error('[LeafletRouteMap] init error:', e)
-          setError('Failed to load map')
+          console.warn('[LeafletRouteMap] falling back to SVG map:', e)
+          setUseFallback(true)
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -260,6 +276,10 @@ export function LeafletRouteMap({
 
     return () => {
       cancelled = true
+      if (observerRef.current) {
+        observerRef.current.disconnect()
+        observerRef.current = null
+      }
       if (map) {
         map.remove()
         mapInstanceRef.current = null
@@ -269,23 +289,38 @@ export function LeafletRouteMap({
 
   if (loading) {
     return (
-      <div className={cn('h-96 rounded-3xl bg-elevated animate-pulse', className)} aria-label="Loading map..." />
+      <div
+        className={cn('h-96 animate-pulse rounded-3xl bg-elevated', className)}
+        style={{ height: 384, minHeight: 320, width: '100%' }}
+        aria-label="Loading map..."
+      />
     )
   }
 
-  if (error) {
+  if (useFallback) {
     return (
-      <div className={cn('h-96 rounded-3xl bg-card flex items-center justify-center text-center p-6', className)}>
-        <div>
-          <div className="text-4xl mb-2">🗺️</div>
-          <p className="font-medium text-ink mb-1">Map unavailable</p>
-          <p className="text-sm text-ink-secondary">{error}</p>
-        </div>
+      <div
+        className={cn('rounded-3xl', className)}
+        style={{ minHeight: 320, width: '100%' }}
+      >
+        <SVGRouteMap
+          origin={origin}
+          destination={destination}
+          waypoints={waypoints}
+          totalKm={totalKm}
+          pickupRadiusKm={pickupRadiusKm}
+          animate
+        />
       </div>
     )
   }
 
   return (
-    <div ref={mapRef} className={cn('h-96 rounded-3xl overflow-hidden', className)} aria-label={`Route from ${origin} to ${destination}`} />
+    <div
+      ref={mapRef}
+      className={cn('h-96 rounded-3xl overflow-hidden', className)}
+      style={{ height: 384, minHeight: 320, width: '100%' }}
+      aria-label={`Route from ${origin} to ${destination}`}
+    />
   )
 }

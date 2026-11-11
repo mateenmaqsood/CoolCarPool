@@ -37,7 +37,14 @@ export default function SignupPage() {
     const { data, error } = await supabase.auth.signUp({
       email: values.email,
       password: values.password,
-      options: { data: { full_name: values.fullName, gender: values.gender } },
+      options: {
+        data: {
+          full_name: values.fullName,
+          gender: values.gender,
+          city: values.city || '',
+          phone: values.phone || '',
+        },
+      },
     })
 
     if (error) {
@@ -62,16 +69,21 @@ export default function SignupPage() {
       return
     }
 
-    // Seed the profile row (RLS: insert own only).
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id: data.user.id,
-      full_name: values.fullName,
-      gender: values.gender,
-      city: values.city || null,
-      phone: values.phone || null,
-      email_verified: false,
-      phone_verified: false,
-    })
+    // Ensure the profile row exists. The on_auth_user_created trigger normally
+    // creates it from raw_user_meta_data; this upsert is an idempotent
+    // fallback (and tops up city/phone) that won't 23505 on conflict.
+    const { error: profileError } = await supabase.from('profiles').upsert(
+      {
+        id: data.user.id,
+        full_name: values.fullName,
+        gender: values.gender,
+        city: values.city || null,
+        phone: values.phone || null,
+        email_verified: false,
+        phone_verified: false,
+      },
+      { onConflict: 'id' }
+    )
 
     if (profileError) {
       // Session exists but profile row failed — surface it, still let them in.

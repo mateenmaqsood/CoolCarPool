@@ -138,6 +138,20 @@ input[type='time']::-webkit-calendar-picker-indicator {
   filter: invert(1);
 }
 
+/* Leaflet map — keep the tile map legible on the charcoal canvas */
+.leaflet-container {
+  background: var(--bg-elevated);
+  font-family: inherit;
+}
+[data-theme='dark'] .leaflet-tile {
+  filter: brightness(0.66) contrast(1.06) saturate(0.75);
+}
+[data-theme='dark'] .leaflet-popup-content-wrapper,
+[data-theme='dark'] .leaflet-popup-tip {
+  background: var(--bg-card);
+  color: var(--fg-primary);
+}
+
 @layer components {
   /* Green accent sweep — used for score bars and progress fills */
   .accent-gradient {
