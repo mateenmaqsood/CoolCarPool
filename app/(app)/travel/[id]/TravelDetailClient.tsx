@@ -39,6 +39,7 @@ const LeafletRouteMap = dynamic(
   }
 )
 import { createClient } from '@/lib/supabase/client'
+import { notifyUsers, getMemberIds } from '@/lib/notify'
 import type { Travel, TravelMember, Waypoint, Profile } from '@/types'
 import { cn, formatPKR, formatDeparture, timeUntil, initials } from '@/lib/utils'
 
@@ -236,6 +237,28 @@ export function TravelDetailClient({
           km_to_origin: req.km_to_origin ?? null,
           seats_reserved: req.seats_requested ?? 1,
         })
+
+        // Notify the requester their ride is confirmed…
+        void notifyUsers([req.requester_id], {
+          type: 'request_accepted',
+          travelId: travel.id,
+          payload: {
+            travel_origin: travel.origin_text,
+            travel_destination: travel.destination_text,
+          },
+        })
+        // …and the rest of the car that a new rider joined.
+        const otherIds = await getMemberIds(travel.id, req.requester_id)
+        const pendingInfo = pendingRequests.find((p) => p.id === requestId)
+        void notifyUsers(otherIds, {
+          type: 'member_joined',
+          travelId: travel.id,
+          payload: {
+            requester_name: pendingInfo?.requester?.full_name ?? 'A new rider',
+            travel_origin: travel.origin_text,
+            travel_destination: travel.destination_text,
+          },
+        })
       }
 
       toast({ title: 'Request accepted', variant: 'success' })
@@ -259,6 +282,22 @@ export function TravelDetailClient({
         .eq('id', requestId)
 
       if (error) throw error
+
+      // Let the requester know they weren't accepted (fetch their id first).
+      const { data: rejectedReq } = await supabase
+        .from('travel_requests')
+        .select('requester_id')
+        .eq('id', requestId)
+        .single()
+      void notifyUsers([rejectedReq?.requester_id], {
+        type: 'request_rejected',
+        travelId: travel.id,
+        payload: {
+          travel_origin: travel.origin_text,
+          travel_destination: travel.destination_text,
+        },
+      })
+
       toast({ title: 'Request rejected', variant: 'success' })
       router.refresh()
     } catch (error) {
@@ -280,6 +319,17 @@ export function TravelDetailClient({
 
       if (error) throw error
       toast({ title: 'Travel locked', description: 'No more join requests accepted.', variant: 'success' })
+
+      // Members should know the car is sealed.
+      const memberIds = await getMemberIds(travel.id)
+      void notifyUsers(memberIds, {
+        type: 'travel_locked',
+        travelId: travel.id,
+        payload: {
+          travel_origin: travel.origin_text,
+          travel_destination: travel.destination_text,
+        },
+      })
       router.refresh()
     } catch (error) {
       console.error('[lock] error:', error)

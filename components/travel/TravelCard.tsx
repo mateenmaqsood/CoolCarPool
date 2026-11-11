@@ -50,19 +50,28 @@ function SeatsPill({ available }: { available: number }) {
 
 function RouteLine({ travel }: { travel: FeedTravel }) {
   return (
-    <div className="flex w-full items-center gap-2 text-sm">
-      <MapPin className="h-4 w-4 shrink-0 text-brand" aria-hidden />
-      <span className="truncate font-medium text-ink">{travel.origin_text}</span>
+    <div className="flex w-full flex-col gap-1 text-sm" aria-label={`Route from ${travel.origin_text} to ${travel.destination_text}`}>
+      {/* Origin */}
+      <div className="flex items-center gap-2">
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-brand shadow-soft" aria-hidden />
+        <span className="truncate font-medium text-ink">{travel.origin_text}</span>
+      </div>
 
-      <span className="relative mx-1 flex flex-1 items-center" aria-hidden>
-        <span className="h-px w-full border-t border-dashed border-line" />
-        <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-pill border border-line bg-elevated px-2 py-0.5 text-[10px] font-semibold text-ink-secondary">
+      {/* Connector with km chip — indented under the dot, never overlapping names */}
+      <div className="flex items-center gap-2 pl-[5px]" aria-hidden>
+        <span className="h-6 w-px border-l border-dashed border-line" />
+        <span className="rounded-pill border border-line bg-elevated px-2 py-0.5 text-[10px] font-semibold tabular text-ink-secondary">
           {Math.round(travel.total_km)} km
         </span>
-      </span>
+        <span className="h-px flex-1 border-t border-dashed border-line" />
+      </div>
 
-      <span className="truncate font-medium text-ink">{travel.destination_text}</span>
-      <ArrowRight className="h-4 w-4 shrink-0 text-ink-tertiary" aria-hidden />
+      {/* Destination */}
+      <div className="flex items-center gap-2">
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--error)]" aria-hidden />
+        <span className="truncate font-medium text-ink">{travel.destination_text}</span>
+        <ArrowRight className="h-4 w-4 shrink-0 rotate-90 text-ink-tertiary" aria-hidden />
+      </div>
     </div>
   )
 }

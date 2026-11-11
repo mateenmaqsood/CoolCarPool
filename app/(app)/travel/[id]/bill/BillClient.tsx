@@ -10,6 +10,7 @@ import { SlipUploader } from '@/components/cost/SlipUploader'
 import { CostBreakdown } from '@/components/cost/CostBreakdown'
 import { useToast } from '@/components/ui/Toast'
 import { createClient } from '@/lib/supabase/client'
+import { notifyUsers } from '@/lib/notify'
 import type { Travel, BillSlip, Profile } from '@/types'
 import { cn, formatDeparture, timeUntil } from '@/lib/utils'
 
@@ -71,6 +72,17 @@ export function BillClient({
 
       toast({ title: 'Receipt saved!', variant: 'success' })
       setShowUploadSuccess(true)
+
+      // Notify every member that the receipt is up (fire-and-forget).
+      const otherIds = members.filter(m => m.user_id !== currentUserId).map(m => m.user_id)
+      void notifyUsers(otherIds, {
+        type: 'bill_uploaded',
+        travelId: travel.id,
+        payload: {
+          travel_origin: travel.origin_text,
+          travel_destination: travel.destination_text,
+        },
+      })
       // In real app, would redirect or refresh
     } catch (error) {
       console.error('[bill] save error:', error)

@@ -23,6 +23,7 @@ import { Dialog, DialogContent } from '@/components/ui/Dialog'
 import { useToast } from '@/components/ui/Toast'
 import { subscribeToTravelMessages, unsubscribe, type Message } from '@/lib/realtime'
 import { createClient } from '@/lib/supabase/client'
+import { notifyUsers } from '@/lib/notify'
 import type { Travel, Profile } from '@/types'
 import { cn, formatDeparture, timeUntil, initials } from '@/lib/utils'
 
@@ -99,6 +100,18 @@ export function ChatClient({ travel, members, messages, currentUserId, isHost }:
       return
     }
     setLocalMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: data.id, created_at: data.created_at } : m))
+
+    // Notify every other member about the new message (fire-and-forget).
+    const otherIds = members.filter(m => m.user_id !== user.id).map(m => m.user_id)
+    void notifyUsers(otherIds, {
+      type: 'chat_message',
+      travelId: travel.id,
+      payload: {
+        sender_name: myProfile?.full_name ?? 'Someone',
+        message_preview: content.slice(0, 50),
+        travel_origin: travel.origin_text,
+      },
+    })
   }
 
   const handleLeaveTravel = async () => {
