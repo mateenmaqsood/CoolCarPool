@@ -43,8 +43,9 @@ import {
   type HostFormValues,
 } from '@/lib/validations'
 import { cn, formatPKR, combineDateAndTime } from '@/lib/utils'
-import { searchAddresses, type GeoResult } from '@/lib/geocode'
-import { estimateTripCost } from '@/lib/fare-engine'
+import { searchAddresses, geocodeAddress, type GeoResult } from '@/lib/geocode'
+import { estimateTripCost, haversineKm } from '@/lib/fare-engine'
+import { shortestRouteBetween } from '@/lib/route-graph'
 
 /* -------------------------------------------------------------------- */
 /* Stepper                                                               */
@@ -303,6 +304,9 @@ export function TravelForm() {
   // Geocoded coordinates for the route endpoints (null = map resolves itself).
   const [originCoords, setOriginCoords] = useState<[number, number] | null>(null)
   const [destCoords, setDestCoords] = useState<[number, number] | null>(null)
+  // Sub-portion rides: pickup points the host declares along the route.
+  const [stops, setStops] = useState<Array<{ label: string; lat: number; lng: number }>>([])
+  const [addingStop, setAddingStop] = useState(false)
 
   const form = useForm<HostFormValues>({
     resolver: zodResolver(hostFormSchema),
@@ -490,6 +494,65 @@ export function TravelForm() {
         is_full_route: true,
         km_from_origin: 0,
       })
+
+      // Sub-portion rides: persist the host's declared pickup points so
+      // riders can join mid-route / get off mid-route. km per stop is
+      // resolved via Haversine → A* highway graph → geocode fallback.
+      // Non-blocking: a failure here never blocks the post.
+      if (stops.length > 0) {
+        try {
+          let originPt: [number, number] | null = originCoords
+          if (!originPt) {
+            const g = await geocodeAddress(v.origin.trim())
+            if (g) originPt = [g.lat, g.lng]
+          }
+
+          const rows: Array<{ label: string; lat: number | null; lng: number | null; km_from_origin: number }> = []
+          for (const stop of stops) {
+            let km: number | null = null
+            const stopCoords: [number, number] | null =
+              Number.isFinite(stop.lat) && Number.isFinite(stop.lng) ? [stop.lat, stop.lng] : null
+            if (originPt && stopCoords) {
+              km = haversineKm(originPt, stopCoords)
+            }
+            if (km == null || km <= 0) {
+              const sp = shortestRouteBetween(v.origin.trim(), stop.label)
+              if (sp && sp.totalKm > 0) km = sp.totalKm
+            }
+            if (km == null || km <= 0) {
+              const geo = stopCoords ? null : await geocodeAddress(stop.label)
+              if (geo && originPt) km = haversineKm(originPt, [geo.lat, geo.lng])
+            }
+            if (km == null || km <= 0) {
+              console.warn('[host] could not resolve km for stop, skipping:', stop.label)
+              continue
+            }
+            rows.push({
+              label: stop.label,
+              lat: Number.isFinite(stop.lat) ? stop.lat : null,
+              lng: Number.isFinite(stop.lng) ? stop.lng : null,
+              km_from_origin: Math.round(km * 10) / 10,
+            })
+          }
+
+          rows.sort((a, b) => a.km_from_origin - b.km_from_origin)
+          if (rows.length > 0) {
+            const { error: wpError } = await supabase.from('waypoints').insert(
+              rows.map((r, i) => ({
+                travel_id: data.id,
+                label: r.label,
+                lat: r.lat,
+                lng: r.lng,
+                km_from_origin: r.km_from_origin,
+                sort_order: i,
+              })),
+            )
+            if (wpError) console.warn('[host] waypoint insert failed:', wpError.message)
+          }
+        } catch (wpErr) {
+          console.warn('[host] waypoint pipeline failed:', wpErr)
+        }
+      }
 
       // BUG 5: vehicle details are captured in the host form now —
       // persist them to the host profile so riders see them.
@@ -718,6 +781,80 @@ export function TravelForm() {
                   setDestCoords(null)
                 }}
               />
+
+              {/* Pickup points along the way — these power sub-portion rides
+                  (riders can join mid-route and get off mid-route) */}
+              <div className="rounded-2xl bg-elevated p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[13px] font-medium text-ink-secondary">
+                      Pickup points along the way
+                    </p>
+                    <p className="text-xs text-ink-tertiary">
+                      Optional — let riders join or leave mid-route (max 5)
+                    </p>
+                  </div>
+                  {stops.length < 5 ? (
+                    <Button type="button" variant="secondary" size="sm" onClick={() => setAddingStop((s) => !s)}>
+                      {addingStop ? 'Done' : '+ Add stop'}
+                    </Button>
+                  ) : null}
+                </div>
+
+                {stops.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {stops.map((stop, i) => (
+                      <span
+                        key={`${stop.label}-${i}`}
+                        className="flex items-center gap-1.5 rounded-pill bg-card px-3 py-1.5 text-xs font-semibold text-ink"
+                      >
+                        <MapPin className="h-3 w-3 text-brand" />
+                        {stop.label}
+                        <button
+                          type="button"
+                          onClick={() => setStops((prev) => prev.filter((_, idx) => idx !== i))}
+                          aria-label={`Remove stop ${stop.label}`}
+                          className="text-ink-tertiary transition-colors hover:text-[var(--error)]"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
+                {addingStop && stops.length < 5 ? (
+                  <div className="mt-3">
+                    <AddressInput
+                      label="Stop location"
+                      placeholder="e.g. Faisalabad, or Packages Mall, Lahore"
+                      value=""
+                      onPick={(text, coords) => {
+                        if (!text.trim()) return
+                        // Reject stops that duplicate origin/destination or an existing stop
+                        const t = text.trim().toLowerCase()
+                        const dup =
+                          t === (values.origin ?? '').trim().toLowerCase() ||
+                          t === (values.destination ?? '').trim().toLowerCase() ||
+                          stops.some((s) => s.label.toLowerCase() === t)
+                        if (dup) {
+                          toast({ title: 'Stop already on the route', variant: 'warning' })
+                          return
+                        }
+                        setStops((prev) => [
+                          ...prev,
+                          {
+                            label: text.trim(),
+                            lat: coords?.[0] ?? NaN,
+                            lng: coords?.[1] ?? NaN,
+                          },
+                        ])
+                        setAddingStop(false)
+                      }}
+                    />
+                  </div>
+                ) : null}
+              </div>
               {(values.origin?.trim() && values.destination?.trim()) && (
                 <div className="mt-4 pt-4 border-t border-line">
                   <p className="text-sm font-medium text-ink-secondary mb-2">Route Preview</p>
