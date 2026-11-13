@@ -468,3 +468,22 @@ CREATE POLICY "notifs_select_own" ON notifications FOR SELECT USING (user_id = a
 CREATE POLICY "notifs_update_own" ON notifications FOR UPDATE USING (user_id = auth.uid());
 CREATE POLICY "notifs_delete_own" ON notifications FOR DELETE USING (user_id = auth.uid());
 CREATE POLICY "notifs_insert_auth" ON notifications FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+-- ============================================================
+-- SECURITY HARDENING BATCH — DB-side sanity caps (additive, safe)
+-- Client validation is bypassable; these enforce at the DB level.
+-- ============================================================
+-- Chat messages: cap length (matches client MAX_MESSAGE_LENGTH = 500)
+ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_content_len;
+ALTER TABLE messages ADD CONSTRAINT messages_content_len
+  CHECK (char_length(content) <= 1000);
+
+-- Bill totals: sane bounds (no negative / absurd amounts)
+ALTER TABLE bill_slips DROP CONSTRAINT IF EXISTS bill_slips_total_bounds;
+ALTER TABLE bill_slips ADD CONSTRAINT bill_slips_total_bounds
+  CHECK (total_pkr IS NULL OR (total_pkr >= 0 AND total_pkr <= 10000000));
+
+-- Waypoint labels bounded (stops editor input)
+ALTER TABLE waypoints DROP CONSTRAINT IF EXISTS waypoints_label_len;
+ALTER TABLE waypoints ADD CONSTRAINT waypoints_label_len
+  CHECK (char_length(label) <= 200);

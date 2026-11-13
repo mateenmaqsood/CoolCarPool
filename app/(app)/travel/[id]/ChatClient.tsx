@@ -27,6 +27,9 @@ import { notifyUsers } from '@/lib/notify'
 import type { Travel, Profile } from '@/types'
 import { cn, formatDeparture, timeUntil, initials } from '@/lib/utils'
 
+/** Client-side chat cap; the DB CHECK enforces it server-side too. */
+const MAX_MESSAGE_LENGTH = 500
+
 interface ChatClientProps {
   travel: Travel & { host?: Profile | null }
   members: Array<{ user_id: string; is_host: boolean; is_full_route: boolean; km_from_origin: number; profile?: Profile | null }>
@@ -77,10 +80,12 @@ export function ChatClient({ travel, members, messages, currentUserId, isHost }:
 
   const handleSendMessage = async () => {
     if (!newMessage.trim()) return
+    // Hard cap (also enforced by a DB CHECK) — no unbounded spam payloads.
+    const content = newMessage.trim().slice(0, MAX_MESSAGE_LENGTH)
+    if (!content) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const content = newMessage.trim()
     setNewMessage('')
     const tempId = `temp-${Date.now()}`
     const myProfile = members.find(m => m.user_id === user.id)?.profile ?? null
@@ -251,6 +256,7 @@ export function ChatClient({ travel, members, messages, currentUserId, isHost }:
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               rows={1}
+              maxLength={MAX_MESSAGE_LENGTH}
               className="flex-1 min-h-[44px] max-h-[120px] rounded-xl bg-card px-3 py-2 text-sm text-ink outline-none focus:ring-2 focus:ring-brand-soft resize-none"
               aria-label="Message"
               style={{ overflow: 'hidden' }}
